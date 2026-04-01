@@ -59,63 +59,64 @@ export function generateTrajectoryPoints(
     let point: THREE.Vector3;
 
     if (t < 0.015) {
-      // ── Phase 1: Launch — ascent from Earth surface ──
+      // ── Phase 1: Launch — ascent from Earth surface to perigee ──
       const lt = t / 0.015;
       const r = EARTH_RADIUS + lt * 0.3;
-      // Rise from surface, curving slightly east
       point = new THREE.Vector3(
         Math.sin(lt * 0.3) * r * 0.1,
         r,
         0
       );
     } else if (t < 0.06) {
-      // ── Phase 2: ICPS burns — elliptical HEO (185 km × 70,000 km) ──
-      // Partial elliptical orbit climbing to apogee and returning to perigee
+      // ── Phase 2: ICPS burns — full 360° elliptical HEO (185 km × 70,000 km) ──
+      // Keplerian orbit: one full revolution, clockwise from perigee at top
       const lt = (t - 0.015) / 0.045;
       const perigeeR = EARTH_RADIUS + 0.3;
       const apogeeR = HEO_APOGEE;
-      // Parametric ellipse: radius oscillates perigee → apogee → perigee
-      const r = perigeeR + (apogeeR - perigeeR) * Math.sin(lt * Math.PI);
-      // Sweep ~180° around Earth (top → right → bottom)
-      const angle = Math.PI * 0.5 - lt * Math.PI;
+      const a = (perigeeR + apogeeR) / 2; // semi-major axis
+      const e = (apogeeR - perigeeR) / (apogeeR + perigeeR); // eccentricity ~0.389
+      // True anomaly sweeps 0 → 2π (full orbit)
+      const theta = lt * Math.PI * 2;
+      const r = (a * (1 - e * e)) / (1 + e * Math.cos(theta));
+      // Clockwise from perigee at top (+Y)
+      const angle = Math.PI * 0.5 - theta;
       point = new THREE.Vector3(
-        Math.cos(angle) * r * 0.7,
+        Math.cos(angle) * r,
         Math.sin(angle) * r,
         lt * 0.3
       );
     } else if (t < 0.08) {
-      // ── Phase 3: Prox ops — loitering near perigee ──
+      // ── Phase 3: Prox ops — loitering near perigee (top) ──
       const lt = (t - 0.06) / 0.02;
       const r = EARTH_RADIUS + 0.3;
-      // Small loitering arc near bottom of orbit
-      const baseAngle = -Math.PI * 0.5;
-      const wobble = Math.sin(lt * Math.PI * 2) * 0.15;
+      // Small loitering arc near perigee at top of orbit
+      const baseAngle = Math.PI * 0.5;
+      const wobble = Math.sin(lt * Math.PI * 2) * 0.12;
       point = new THREE.Vector3(
-        Math.cos(baseAngle + lt * 0.4) * (r + wobble) * 0.7,
-        Math.sin(baseAngle + lt * 0.4) * (r + wobble),
-        0.3 + lt * 0.1
+        Math.cos(baseAngle - lt * 0.3) * (r + wobble),
+        Math.sin(baseAngle - lt * 0.3) * (r + wobble),
+        0.3 + lt * 0.05
       );
     } else if (t < 0.10) {
-      // ── Phase 4: TLI burn — escape from perigee ──
+      // ── Phase 4: TLI burn — smooth tangential departure from perigee ──
+      // Bezier curve departing tangentially in +X direction from perigee
       const lt = (t - 0.08) / 0.02;
-      // Accelerating outward from perigee toward Moon
-      const startR = EARTH_RADIUS + 0.3;
-      const endR = EARTH_RADIUS + 2.5;
-      const r = startR + (endR - startR) * lt * lt;
-      const angle = -Math.PI * 0.5 + 0.4 + lt * 0.6;
-      point = new THREE.Vector3(
-        Math.cos(angle) * r * 0.7 + lt * 1.5,
-        Math.sin(angle) * r + lt * 2,
-        0.4 + lt * 0.5
+      const perigeeR = EARTH_RADIUS + 0.3;
+      const p0 = new THREE.Vector3(
+        Math.cos(Math.PI * 0.5 - 0.3) * perigeeR,
+        Math.sin(Math.PI * 0.5 - 0.3) * perigeeR,
+        0.35
       );
+      const p1 = new THREE.Vector3(2.5, 3.5, 0.45);
+      const p2 = new THREE.Vector3(3.5, 5.0, 0.65);
+      const p3 = new THREE.Vector3(4.5, 5.5, 0.8);
+      point = cubicBezier(p0, p1, p2, p3, lt);
     } else if (t < 0.46) {
       // ── Phase 5: Outbound coast to Moon (~4 days) ──
-      // Bezier curve from TLI departure to flyby entry point.
-      // Control points arc above the Earth-Moon line, staying well
-      // clear of the Moon (all control X < 35).
+      // Bezier from TLI end to flyby entry, arcing above Earth-Moon line
       const lt = (t - 0.10) / 0.36;
-      const p0 = new THREE.Vector3(1.5, EARTH_RADIUS + 2.5, 0.9);
-      const p1 = new THREE.Vector3(10, 12, 2.0);
+      const p0 = new THREE.Vector3(4.5, 5.5, 0.8);
+      const p1 = new THREE.Vector3(12, 10, 2.0);
       const p2 = new THREE.Vector3(26, 8, 3.0);
       const p3 = FLYBY_ENTRY.clone();
       point = cubicBezier(p0, p1, p2, p3, lt);

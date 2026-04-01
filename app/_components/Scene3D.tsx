@@ -2,7 +2,14 @@
 
 import { useRef, useMemo, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Stars, Line, OrbitControls, Html } from "@react-three/drei";
+import { Line, OrbitControls, Html } from "@react-three/drei";
+import {
+  EffectComposer,
+  Bloom,
+  ToneMapping,
+  Vignette,
+} from "@react-three/postprocessing";
+import { ToneMappingMode, BlendFunction } from "postprocessing";
 import * as THREE from "three";
 import {
   generateTrajectoryPoints,
@@ -24,7 +31,12 @@ interface Scene3DProps {
 
 const EARTH_POS = new THREE.Vector3(0, 0, 0);
 const MOON_POS = new THREE.Vector3(40, 0, 3);
-const SUN_DIR = new THREE.Vector3(50, 20, 30).normalize();
+// Full Moon geometry: Sun is behind Earth, opposite Moon direction.
+// Moon orbit has ~5.14° inclination to ecliptic.
+const MOON_DIR = new THREE.Vector3(40, 0, 3).normalize();
+const SUN_DIR = MOON_DIR.clone().negate();
+SUN_DIR.y += 0.08; // ecliptic offset
+SUN_DIR.normalize();
 
 // ── GLSL Noise ───────────────────────────────────────────
 
@@ -176,18 +188,22 @@ void main() {
   float spec = pow(max(0.0, dot(normal, halfVec)), 80.0);
   dayColor += vec3(1.0, 0.95, 0.8) * spec * 0.5 * (1.0 - continent);
 
-  // ── Night side: city lights ──
+  // ── Terminator atmospheric reddening ──
+  float terminatorBand = smoothstep(-0.15, 0.0, NdotL) * smoothstep(0.2, 0.05, NdotL);
+  dayColor = mix(dayColor, dayColor * vec3(1.1, 0.7, 0.5), terminatorBand * 0.4);
+
+  // ── Night side: city lights (HDR for bloom) ──
   float cityNoise = fbm(spherePos * 8.0 + vec3(50.0, 25.0, 12.0), 4);
   float cityMask = smoothstep(0.3, 0.6, cityNoise) * continent * (1.0 - iceMask);
-  vec3 cityColor = vec3(1.0, 0.85, 0.5) * cityMask * 0.3;
+  vec3 cityColor = vec3(1.0, 0.85, 0.5) * cityMask * 2.0;
   vec3 nightColor = surfaceColor * 0.02 + cityColor;
 
   // ── Final mix day/night ──
   vec3 finalColor = mix(nightColor, dayColor, dayFactor);
 
-  // Subtle Fresnel rim
+  // Fresnel rim
   float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 3.0);
-  finalColor += vec3(0.2, 0.5, 1.0) * fresnel * 0.15 * dayFactor;
+  finalColor += vec3(0.2, 0.5, 1.0) * fresnel * 0.2 * dayFactor;
 
   gl_FragColor = vec4(finalColor, 1.0);
 }
@@ -217,11 +233,28 @@ void main() {
   vec3 normal = normalize(vNormal);
   vec3 viewDir = normalize(cameraPosition - vWorldPos);
 
-  float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 2.5);
-  float sunFactor = max(0.15, dot(normal, uSunDir) * 0.5 + 0.5);
+  // Fresnel limb brightness
+  float rim = 1.0 - max(0.0, dot(normal, viewDir));
+  float fresnel = pow(rim, 3.0);
 
-  vec3 atmosColor = mix(vec3(0.3, 0.6, 1.0), vec3(0.5, 0.8, 1.0), fresnel);
-  float alpha = fresnel * 0.6 * sunFactor;
+  // Sun alignment
+  float sunDot = dot(normal, uSunDir);
+  float sunFactor = smoothstep(-0.3, 0.5, sunDot);
+
+  // Rayleigh scattering: blue at limb, orange/red at terminator
+  vec3 rayleighBlue = vec3(0.15, 0.45, 1.0);
+  vec3 rayleighOrange = vec3(1.0, 0.4, 0.1);
+
+  // Terminator detection (grazing sun angle)
+  float terminator = 1.0 - abs(sunDot);
+  terminator = pow(terminator, 4.0) * smoothstep(-0.15, 0.15, sunDot);
+
+  vec3 atmosColor = mix(rayleighBlue, rayleighOrange, terminator * 0.7);
+
+  // HDR push for bloom
+  atmosColor *= 1.3;
+
+  float alpha = fresnel * (0.5 * sunFactor + 0.15 + terminator * 0.4) * 0.7;
 
   gl_FragColor = vec4(atmosColor, alpha);
 }
@@ -257,15 +290,15 @@ void main() {
   vec3 normal = normalize(vNormal);
   vec3 spherePos = normalize(vWorldPos) * 2.0;
 
-  // Animated cloud noise
+  // Animated cloud noise (~67% coverage)
   float cloudNoise = fbm(spherePos * 2.5 + vec3(uTime * 0.01, 0.0, uTime * 0.005), 5);
-  float cloudMask = smoothstep(0.1, 0.4, cloudNoise);
+  float cloudMask = smoothstep(0.0, 0.35, cloudNoise);
 
   float NdotL = dot(normal, uSunDir);
   float dayFactor = smoothstep(-0.1, 0.3, NdotL);
 
   vec3 cloudColor = vec3(1.0) * (0.4 + 0.6 * max(0.0, NdotL));
-  float alpha = cloudMask * 0.45 * dayFactor;
+  float alpha = cloudMask * 0.45 * max(0.05, dayFactor);
 
   gl_FragColor = vec4(cloudColor, alpha);
 }
@@ -290,40 +323,52 @@ ${SIMPLEX_NOISE_GLSL}
 
 uniform vec3 uSunDir;
 uniform vec3 uMoonCenter;
+uniform vec3 uEarthDir;
 
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 
 void main() {
   vec3 normal = normalize(vNormal);
-  vec3 localPos = normalize(vWorldPos - uMoonCenter) * 2.0;
+  vec3 localDir = normalize(vWorldPos - uMoonCenter);
+  vec3 localPos = localDir * 2.0;
   vec3 viewDir = normalize(cameraPosition - vWorldPos);
+
+  // ── Near-side vs far-side factor ──
+  // +1 = Earth-facing (near side, maria-rich), -1 = far side (highlands)
+  float nearSideFactor = dot(localDir, uEarthDir);
 
   // ── Base surface with variation ──
   float baseNoise = fbm(localPos * 3.0 + vec3(100.0, 50.0, 25.0), 4) * 0.5 + 0.5;
-  vec3 baseColor = mix(vec3(0.45, 0.43, 0.40), vec3(0.60, 0.58, 0.55), baseNoise);
+  vec3 highlands = mix(vec3(0.50, 0.48, 0.45), vec3(0.62, 0.60, 0.57), baseNoise);
+  vec3 baseColor = highlands;
 
-  // ── Dark maria (lunar seas) ──
+  // ── Dark maria — concentrated on near side ──
   float mariaNoise = fbm(localPos * 1.0 + vec3(200.0, 100.0, 50.0), 3);
-  float mariaMask = smoothstep(-0.1, 0.3, mariaNoise);
-  vec3 mariaColor = vec3(0.25, 0.24, 0.22);
-  baseColor = mix(baseColor, mariaColor, mariaMask * 0.6);
+  float mariaMask = smoothstep(-0.1, 0.3, mariaNoise) * smoothstep(0.0, 0.5, nearSideFactor);
+  vec3 mariaColor = vec3(0.22, 0.21, 0.19);
+  baseColor = mix(baseColor, mariaColor, mariaMask * 0.7);
 
-  // ── Craters (sharp threshold noise) ──
+  // ── Large craters ──
   float craterNoise = snoise(localPos * 12.0 + vec3(300.0, 150.0, 75.0));
   float craterRim = smoothstep(0.35, 0.45, craterNoise) - smoothstep(0.45, 0.55, craterNoise);
   float craterFloor = smoothstep(0.45, 0.55, craterNoise);
-  baseColor += vec3(0.12) * craterRim; // bright rim
-  baseColor -= vec3(0.08) * craterFloor; // dark floor
+  baseColor += vec3(0.12) * craterRim;
+  baseColor -= vec3(0.08) * craterFloor;
 
-  // Small craters
+  // ── Medium craters ──
   float smallCrater = snoise(localPos * 25.0 + vec3(500.0, 250.0, 125.0));
   float smallRim = smoothstep(0.4, 0.48, smallCrater) - smoothstep(0.48, 0.56, smallCrater);
   baseColor += vec3(0.08) * smallRim;
 
+  // ── Micro craters ──
+  float microCrater = snoise(localPos * 50.0 + vec3(700.0, 350.0, 175.0));
+  float microRim = smoothstep(0.42, 0.48, microCrater) - smoothstep(0.48, 0.54, microCrater);
+  baseColor += vec3(0.05) * microRim;
+
   // ── Lighting ──
   float NdotL = max(0.0, dot(normal, uSunDir));
-  vec3 litColor = baseColor * (0.08 + 0.92 * NdotL);
+  vec3 litColor = baseColor * (0.06 + 0.94 * NdotL);
 
   gl_FragColor = vec4(litColor, 1.0);
 }
@@ -348,25 +393,21 @@ export default function Scene3D({
     <Canvas
       camera={{ position: [0, 5, 12], fov: 55, near: 0.1, far: 500 }}
       style={{ background: "transparent" }}
-      gl={{ alpha: true, antialias: true }}
+      gl={{
+        alpha: true,
+        antialias: true,
+        toneMapping: THREE.NoToneMapping,
+        outputColorSpace: THREE.SRGBColorSpace,
+      }}
     >
-      <hemisphereLight
-        args={["#4488cc", "#111122", 0.3]}
-      />
+      <hemisphereLight args={["#334466", "#0a0a18", 0.25]} />
       <directionalLight
-        position={[50, 20, 30]}
-        intensity={1.8}
-        color="#fff5e0"
+        position={[SUN_DIR.x * 80, SUN_DIR.y * 80, SUN_DIR.z * 80]}
+        intensity={2.0}
+        color="#fff8f0"
       />
 
-      <Stars
-        radius={250}
-        depth={100}
-        count={1500}
-        factor={2}
-        fade
-        speed={0}
-      />
+      <CustomStars />
 
       <Earth />
       <Moon />
@@ -391,8 +432,84 @@ export default function Scene3D({
         autoRotate={false}
         makeDefault
       />
+
+      <EffectComposer multisampling={0}>
+        <Bloom
+          intensity={1.2}
+          luminanceThreshold={0.6}
+          luminanceSmoothing={0.4}
+          mipmapBlur
+          radius={0.8}
+        />
+        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+        <Vignette
+          offset={0.3}
+          darkness={0.6}
+          blendFunction={BlendFunction.NORMAL}
+        />
+      </EffectComposer>
     </Canvas>
   );
+}
+
+// ── Custom Star Field ────────────────────────────────────
+
+function CustomStars() {
+  const { geometry, material } = useMemo(() => {
+    const count = 3000;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+
+    const starColors = [
+      new THREE.Color(0.6, 0.7, 1.0), // O/B blue-white (rare)
+      new THREE.Color(0.8, 0.85, 1.0), // A white
+      new THREE.Color(1.0, 1.0, 0.9), // F/G yellow-white (Sun-like)
+      new THREE.Color(1.0, 0.85, 0.6), // K orange
+      new THREE.Color(1.0, 0.6, 0.4), // M red-orange
+    ];
+
+    for (let i = 0; i < count; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const r = 200 + Math.random() * 50;
+
+      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      positions[i * 3 + 2] = r * Math.cos(phi);
+
+      // Spectral type distribution: more dim red/orange than bright blue
+      const roll = Math.random();
+      let color: THREE.Color;
+      if (roll < 0.02) color = starColors[0];
+      else if (roll < 0.08) color = starColors[1];
+      else if (roll < 0.25) color = starColors[2];
+      else if (roll < 0.55) color = starColors[3];
+      else color = starColors[4];
+
+      // Brightness variation (power-law: many dim, few bright)
+      const brightness = 0.3 + Math.pow(Math.random(), 3) * 1.5;
+      colors[i * 3] = color.r * brightness;
+      colors[i * 3 + 1] = color.g * brightness;
+      colors[i * 3 + 2] = color.b * brightness;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    const mat = new THREE.PointsMaterial({
+      vertexColors: true,
+      size: 0.8,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+    });
+
+    return { geometry: geo, material: mat };
+  }, []);
+
+  return <points geometry={geometry} material={material} />;
 }
 
 // ── Earth ────────────────────────────────────────────────
@@ -438,7 +555,7 @@ function Earth() {
   });
 
   return (
-    <group position={[0, 0, 0]}>
+    <group position={[0, 0, 0]} rotation={[0, 0, -23.44 * (Math.PI / 180)]}>
       {/* Earth surface */}
       <mesh ref={meshRef}>
         <sphereGeometry args={[3, 128, 128]} />
@@ -507,15 +624,16 @@ function Moon() {
     () => ({
       uSunDir: { value: SUN_DIR.clone() },
       uMoonCenter: { value: MOON_POS.clone() },
+      uEarthDir: {
+        value: new THREE.Vector3()
+          .subVectors(EARTH_POS, MOON_POS)
+          .normalize(),
+      },
     }),
     []
   );
 
-  useFrame((_, delta) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += delta * 0.02;
-    }
-  });
+  // Moon is tidally locked — no rotation
 
   return (
     <group position={[MOON_POS.x, MOON_POS.y, MOON_POS.z]}>
@@ -579,15 +697,28 @@ function TrajectoryPath({
   return (
     <>
       {traveledPoints.length >= 2 && (
-        <Line
-          points={traveledPoints}
-          vertexColors={traveledColors.map(
-            (c) => [c.r, c.g, c.b] as [number, number, number]
-          )}
-          lineWidth={2}
-          transparent
-          opacity={0.9}
-        />
+        <>
+          {/* Glow line (wider, HDR colors for bloom) */}
+          <Line
+            points={traveledPoints}
+            vertexColors={traveledColors.map(
+              (c) => [c.r * 2, c.g * 2, c.b * 2] as [number, number, number]
+            )}
+            lineWidth={4}
+            transparent
+            opacity={0.15}
+          />
+          {/* Primary traveled line */}
+          <Line
+            points={traveledPoints}
+            vertexColors={traveledColors.map(
+              (c) => [c.r, c.g, c.b] as [number, number, number]
+            )}
+            lineWidth={2}
+            transparent
+            opacity={0.9}
+          />
+        </>
       )}
       {remainingPoints.length >= 2 && (
         <Line
@@ -642,69 +773,72 @@ function OrionCapsule({
 
   return (
     <group ref={groupRef}>
-      {/* Capsule body (cone) */}
-      <mesh position={[0, 0.2, 0]}>
-        <coneGeometry args={[0.15, 0.4, 8]} />
+      {/* Crew Module — silver metallic frustum */}
+      <mesh position={[0, 0.25, 0]}>
+        <cylinderGeometry args={[0.08, 0.15, 0.3, 16]} />
         <meshStandardMaterial
-          color="#e0e0e0"
-          metalness={0.6}
-          roughness={0.3}
-        />
-      </mesh>
-      {/* Service module (cylinder) */}
-      <mesh position={[0, -0.2, 0]}>
-        <cylinderGeometry args={[0.15, 0.18, 0.4, 8]} />
-        <meshStandardMaterial
-          color="#888888"
-          metalness={0.4}
-          roughness={0.5}
-        />
-      </mesh>
-      {/* Nozzle */}
-      <mesh position={[0, -0.45, 0]}>
-        <cylinderGeometry args={[0.08, 0.12, 0.1, 8]} />
-        <meshStandardMaterial
-          color="#555555"
+          color="#c0c4cc"
           metalness={0.7}
-          roughness={0.2}
-        />
-      </mesh>
-      {/* Solar panels */}
-      <mesh position={[0.4, -0.2, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <boxGeometry args={[0.02, 0.5, 0.15]} />
-        <meshStandardMaterial
-          color="#1a3a5c"
-          emissive="#1a3a8c"
-          emissiveIntensity={0.2}
-        />
-      </mesh>
-      <mesh position={[-0.4, -0.2, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <boxGeometry args={[0.02, 0.5, 0.15]} />
-        <meshStandardMaterial
-          color="#1a3a5c"
-          emissive="#1a3a8c"
-          emissiveIntensity={0.2}
+          roughness={0.25}
         />
       </mesh>
 
-      {/* Engine exhaust glow (visible during burns) */}
-      {burning && (
-        <group position={[0, -0.55, 0]}>
-          <pointLight color="#ff6a00" intensity={4} distance={5} />
-          <mesh>
-            <sphereGeometry args={[0.1, 16, 16]} />
-            <meshBasicMaterial
-              color="#ff8833"
-              transparent
-              opacity={0.8}
+      {/* Heat shield — disk at capsule base */}
+      <mesh position={[0, 0.095, 0]}>
+        <cylinderGeometry args={[0.155, 0.155, 0.01, 16]} />
+        <meshStandardMaterial color="#d4cfc8" metalness={0.2} roughness={0.7} />
+      </mesh>
+
+      {/* European Service Module — gold/amber Kapton MLI */}
+      <mesh position={[0, -0.1, 0]}>
+        <cylinderGeometry args={[0.13, 0.13, 0.35, 16]} />
+        <meshStandardMaterial
+          color="#b8860b"
+          emissive="#4a3500"
+          emissiveIntensity={0.15}
+          metalness={0.8}
+          roughness={0.3}
+        />
+      </mesh>
+
+      {/* AJ10 Engine Nozzle — dark metallic bell */}
+      <mesh position={[0, -0.35, 0]}>
+        <cylinderGeometry args={[0.06, 0.1, 0.12, 12]} />
+        <meshStandardMaterial color="#3a3a3a" metalness={0.85} roughness={0.15} />
+      </mesh>
+
+      {/* X-wing solar arrays (4 wings at 45/135/225/315 deg) */}
+      {[Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4].map((angle, i) => (
+        <group key={i} position={[0, -0.1, 0]} rotation={[0, angle, 0]}>
+          <mesh position={[0.4, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <boxGeometry args={[0.02, 0.55, 0.1]} />
+            <meshStandardMaterial
+              color="#0a1628"
+              emissive="#0a1a3c"
+              emissiveIntensity={0.1}
+              metalness={0.3}
+              roughness={0.6}
             />
           </mesh>
-          <mesh>
-            <sphereGeometry args={[0.2, 16, 16]} />
+        </group>
+      ))}
+
+      {/* Engine exhaust — HDR for bloom */}
+      {burning && (
+        <group position={[0, -0.5, 0]}>
+          <pointLight color="#ff6a00" intensity={8} distance={6} />
+          {/* White-hot core */}
+          <mesh rotation={[Math.PI, 0, 0]}>
+            <coneGeometry args={[0.04, 0.25, 8]} />
+            <meshBasicMaterial color={new THREE.Color(4.0, 2.5, 0.5)} />
+          </mesh>
+          {/* Outer plume */}
+          <mesh rotation={[Math.PI, 0, 0]}>
+            <coneGeometry args={[0.1, 0.5, 8]} />
             <meshBasicMaterial
-              color="#ff6600"
+              color={new THREE.Color(3.0, 1.2, 0.1)}
               transparent
-              opacity={0.3}
+              opacity={0.4}
             />
           </mesh>
         </group>
