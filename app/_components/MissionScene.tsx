@@ -58,6 +58,24 @@ export default function MissionScene() {
     return Math.max(1, Math.ceil(metSec / 86400));
   }, [mode, manualProgress, mission.metSeconds]);
 
+  const nextPhase = activePhaseIndex < missionStages.length - 1
+    ? missionStages[activePhaseIndex + 1]
+    : null;
+
+  const timeToNext = useMemo(() => {
+    if (!nextPhase) return null;
+    const metSec = activeMET / 1000;
+    const remaining = nextPhase.startMET - metSec;
+    if (remaining <= 0) return null;
+    const totalSec = Math.floor(remaining);
+    const d = Math.floor(totalSec / 86400);
+    const h = Math.floor((totalSec % 86400) / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return d > 0 ? `${d}d ${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(h)}:${pad(m)}:${pad(s)}`;
+  }, [nextPhase, activeMET]);
+
   const handleSliderChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = parseFloat(e.target.value);
@@ -145,6 +163,31 @@ export default function MissionScene() {
             cameraMode={cameraMode}
             onCameraModeChange={setCameraMode}
           />
+
+          {/* Stage info panel */}
+          <div className="absolute bottom-16 left-3 z-10 hidden sm:block max-w-[280px]">
+            <div className="backdrop-blur-md bg-white/5 border border-white/10 rounded-xl px-3.5 py-3 space-y-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className={`w-1.5 h-1.5 rounded-full ${activePhase.bgColor}`} />
+                  <span className="text-[11px] font-mono font-semibold text-white/90 truncate">
+                    {activePhase.name}
+                  </span>
+                </div>
+                <p className="text-[10px] font-mono text-zinc-400 mt-1 line-clamp-2 leading-relaxed pl-3.5">
+                  {activePhase.description}
+                </p>
+              </div>
+              {nextPhase && timeToNext && (
+                <div className="flex items-center gap-2 pt-1 border-t border-white/5 text-[10px] font-mono">
+                  <span className="text-zinc-600 uppercase tracking-wider">Next</span>
+                  <span className="text-zinc-400 truncate">{nextPhase.shortName}</span>
+                  <span className="text-zinc-600 ml-auto">in</span>
+                  <span className="text-zinc-300 tabular-nums">{timeToNext}</span>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Bottom: Timeline */}
           <div className="absolute bottom-0 left-0 right-0 z-10 px-5 pb-4 pt-6 bg-gradient-to-t from-black/60 to-transparent">
