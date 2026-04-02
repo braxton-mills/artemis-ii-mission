@@ -71,9 +71,9 @@ export default function StageCard({
       style={{ transitionDelay: `${index * 80}ms` }}
     >
       {/* Timeline dot */}
-      <div className="absolute left-0 top-6 -translate-x-1/2 z-10">
+      <div className="absolute left-0 top-5 sm:top-6 -translate-x-1/2 z-10">
         <div
-          className={`w-3 h-3 rounded-full border-2 transition-colors ${
+          className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 transition-colors ${
             isActive
               ? `${stage.bgColor} border-white shadow-lg`
               : isCompleted
@@ -92,57 +92,57 @@ export default function StageCard({
       {/* Card */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className={`ml-6 sm:ml-8 w-full text-left glass-card glass-card-hover rounded-xl p-4 sm:p-5 transition-all duration-300 cursor-pointer ${
+        className={`ml-4 sm:ml-8 w-full text-left glass-card glass-card-hover rounded-xl p-3 sm:p-5 transition-all duration-300 cursor-pointer ${
           isActive ? "ring-1 ring-blue-500/20" : ""
         }`}
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-xl flex-shrink-0" role="img" aria-label={stage.icon}>
+        <div className="flex items-start justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <span className="text-base sm:text-xl flex-shrink-0" role="img" aria-label={stage.icon}>
               {stageIcons[stage.icon] || "\u2B50"}
             </span>
             <div className="min-w-0">
-              <h3
-                className={`text-base font-semibold ${
-                  isActive || isCompleted ? "text-white" : "text-zinc-400"
-                }`}
-              >
-                {stage.name}
-              </h3>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] font-mono text-zinc-600">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3
+                  className={`text-sm sm:text-base font-semibold ${
+                    isActive || isCompleted ? "text-white" : "text-zinc-400"
+                  }`}
+                >
+                  {stage.name}
+                </h3>
+                {isActive && (
+                  <span className="text-[9px] sm:text-[10px] font-mono uppercase tracking-widest text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                    Active
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 flex-wrap">
+                <span className="text-[9px] sm:text-[10px] font-mono text-zinc-600">
                   {formatMET(stage.startMET * 1000)} → {formatMET(stage.endMET * 1000)}
                 </span>
-                <span className={`text-[10px] font-mono ${stage.color}`}>
+                <span className={`text-[9px] sm:text-[10px] font-mono ${stage.color}`}>
                   {durationStr}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0 mt-1">
-            {isActive && (
-              <span className="text-[10px] font-mono uppercase tracking-widest text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
-                Active
-              </span>
-            )}
-            <svg
-              className={`w-4 h-4 text-zinc-600 transition-transform duration-300 ${
-                expanded ? "rotate-180" : ""
-              }`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
+          <svg
+            className={`w-4 h-4 text-zinc-600 transition-transform duration-300 flex-shrink-0 mt-0.5 ${
+              expanded ? "rotate-180" : ""
+            }`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
 
         {/* Description — always visible */}
-        <p className="mt-2.5 text-sm text-zinc-500 leading-relaxed">
+        <p className="mt-2 sm:mt-2.5 text-xs sm:text-sm text-zinc-500 leading-relaxed">
           {stage.description}
         </p>
 
@@ -154,11 +154,11 @@ export default function StageCard({
         >
           <div className="overflow-hidden">
             <div className="border-t border-white/5 pt-3">
-              <p className="text-sm text-zinc-300 leading-relaxed mb-4">
+              <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed mb-3 sm:mb-4">
                 {stage.details}
               </p>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
                 <TelemetryItem
                   label="Peak Alt."
                   value={`${stage.altitude.peak.toLocaleString()} km`}
@@ -186,11 +186,11 @@ export default function StageCard({
 
 function TelemetryItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white/[0.02] rounded-lg p-2.5">
-      <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-0.5">
+    <div className="bg-white/[0.02] rounded-lg p-2 sm:p-2.5">
+      <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-0.5">
         {label}
       </div>
-      <div className="text-xs font-mono text-zinc-300">{value}</div>
+      <div className="text-[10px] sm:text-xs font-mono text-zinc-300 break-all">{value}</div>
     </div>
   );
 }
