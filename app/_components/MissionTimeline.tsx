@@ -37,7 +37,7 @@ export default function MissionTimeline() {
           )}
 
           {/* Stage cards */}
-          <div className="space-y-1 sm:space-y-3">
+          <div className="space-y-0 sm:space-y-3">
             {missionStages.map((stage, i) => (
               <StageCard
                 key={stage.id}
