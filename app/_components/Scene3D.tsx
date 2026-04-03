@@ -1438,8 +1438,8 @@ function OrionCapsule({
         <OrionPrimitive burning={burning} />
       )}
 
-      {/* Dim locator light above capsule for visibility at distance */}
-      <pointLight position={[0, 0.45, 0]} color="#3b82f6" intensity={0.3} distance={2} />
+      {/* Locator light — above capsule so the front is illuminated */}
+      <pointLight position={[0, 0.6, 0]} color="#3b82f6" intensity={0.5} distance={3} />
 
       {/* RCS thruster pulses — intermittent attitude control during coast */}
       {!burning && <RCSFlicker />}
