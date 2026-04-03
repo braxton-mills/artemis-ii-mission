@@ -21,6 +21,7 @@ export interface CrewMember {
   nationality: string;
   bio: string;
   initials: string;
+  alma: string[];
 }
 
 // Artemis II launch: April 1, 2026, 6:36 PM EDT = 22:36 UTC (12-min delay)
@@ -211,6 +212,7 @@ export const crew: CrewMember[] = [
     nationality: "American",
     bio: "U.S. Navy captain and test pilot. Flew aboard the ISS during Expedition 41 and served as NASA\u2019s Chief Astronaut before stepping down to focus on Artemis II training.",
     initials: "RW",
+    alma: ["Rensselaer Polytechnic Institute (B.S.)", "Johns Hopkins University (M.S.)"],
   },
   {
     name: "Victor Glover",
@@ -219,6 +221,7 @@ export const crew: CrewMember[] = [
     nationality: "American",
     bio: "U.S. Navy test pilot who piloted SpaceX Crew-1, the first operational Crew Dragon flight. Will become the first Black astronaut to fly beyond low Earth orbit.",
     initials: "VG",
+    alma: ["Cal Poly San Luis Obispo (B.S.)", "Air University (M.S., M.A.)"],
   },
   {
     name: "Christina Koch",
@@ -227,6 +230,7 @@ export const crew: CrewMember[] = [
     nationality: "American",
     bio: "Holds the record for the longest single spaceflight by a woman at 328 days. Participated in the first all-female spacewalk in 2019. Will prepare and initiate the TLI burn.",
     initials: "CK",
+    alma: ["NC State University (B.S., M.S.)"],
   },
   {
     name: "Jeremy Hansen",
@@ -235,5 +239,6 @@ export const crew: CrewMember[] = [
     nationality: "Canadian",
     bio: "Canadian Space Agency astronaut and former CF-18 Hornet fighter pilot. Will become the first Canadian — and first non-American — ever to fly beyond low Earth orbit.",
     initials: "JH",
+    alma: ["Royal Military College of Canada (B.Sc., M.Sc.)"],
   },
 ];
