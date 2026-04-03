@@ -1282,6 +1282,53 @@ function OrionSTL({ burning }: { burning: boolean }) {
   );
 }
 
+const RCS_POSITIONS = [
+  [0.19, -0.05, 0],
+  [0, -0.05, 0.19],
+  [-0.19, -0.05, 0],
+  [0, -0.05, -0.19],
+] as const;
+
+function RCSFlicker() {
+  const lightsRef = useRef<(THREE.PointLight | null)[]>([]);
+  const timerRef = useRef(0);
+  const activeRef = useRef(-1);
+
+  useFrame((_, delta) => {
+    timerRef.current += delta;
+    // Random pulse every 0.8–2.5 seconds
+    if (timerRef.current > 0.8 + Math.random() * 1.7) {
+      timerRef.current = 0;
+      activeRef.current = Math.floor(Math.random() * 4);
+    }
+    // Each pulse lasts ~0.15s then fades
+    for (let i = 0; i < 4; i++) {
+      const light = lightsRef.current[i];
+      if (!light) continue;
+      if (i === activeRef.current && timerRef.current < 0.15) {
+        light.intensity = 3 * (1 - timerRef.current / 0.15);
+      } else {
+        light.intensity = 0;
+      }
+    }
+  });
+
+  return (
+    <>
+      {RCS_POSITIONS.map((pos, i) => (
+        <pointLight
+          key={`rcs-light-${i}`}
+          ref={(el) => { lightsRef.current[i] = el; }}
+          position={[pos[0], pos[1], pos[2]]}
+          color="#ffaa44"
+          intensity={0}
+          distance={1.5}
+        />
+      ))}
+    </>
+  );
+}
+
 function OrionCapsule({
   missionProgress,
   phaseIndex,
@@ -1329,6 +1376,12 @@ function OrionCapsule({
       ) : (
         <OrionPrimitive burning={burning} />
       )}
+
+      {/* Dim locator light above capsule for visibility at distance */}
+      <pointLight position={[0, 0.45, 0]} color="#3b82f6" intensity={0.3} distance={2} />
+
+      {/* RCS thruster pulses — intermittent attitude control during coast */}
+      {!burning && <RCSFlicker />}
 
       {/* Label */}
       <Html position={[0, 1, 0]} center>
