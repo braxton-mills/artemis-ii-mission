@@ -92,7 +92,7 @@ export default function StageCard({
       {/* Card */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className={`ml-4 sm:ml-8 w-full text-left glass-card glass-card-hover rounded-lg sm:rounded-xl p-3 sm:p-5 transition-all duration-300 cursor-pointer ${
+        className={`ml-4 sm:ml-8 block text-left glass-card glass-card-hover rounded-lg sm:rounded-xl p-3 sm:p-5 transition-all duration-300 cursor-pointer ${
           isActive ? "ring-1 ring-blue-500/20" : ""
         }`}
       >
