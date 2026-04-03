@@ -1,24 +1,26 @@
-"use client";
+'use client';
 
-import { useRef, useMemo, useEffect } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Line, OrbitControls, Html } from "@react-three/drei";
+import { useRef, useMemo, useEffect, useState, Suspense } from 'react';
+import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
+import { Line, OrbitControls, Html, useTexture } from '@react-three/drei';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import {
   EffectComposer,
   Bloom,
   ToneMapping,
   Vignette,
-} from "@react-three/postprocessing";
-import { ToneMappingMode, BlendFunction } from "postprocessing";
-import * as THREE from "three";
+} from '@react-three/postprocessing';
+import { ToneMappingMode, BlendFunction } from 'postprocessing';
+import * as THREE from 'three';
+import { setConsoleFunction } from 'three';
 import {
   generateTrajectoryPoints,
   getPositionAtProgress,
-} from "../_lib/trajectory";
+} from '../_lib/trajectory';
 
 // ── Types ────────────────────────────────────────────────
 
-export type CameraMode = "follow" | "earth" | "moon" | "overview" | "free";
+export type CameraMode = 'follow' | 'earth' | 'moon' | 'overview' | 'free';
 
 interface Scene3DProps {
   missionProgress: number;
@@ -37,6 +39,19 @@ const MOON_DIR = new THREE.Vector3(40, 0, 3).normalize();
 const SUN_DIR = MOON_DIR.clone().negate();
 SUN_DIR.y += 0.08; // ecliptic offset
 SUN_DIR.normalize();
+
+// Suppress THREE.Clock deprecation from @react-three/fiber v9 internals.
+// r3f creates new THREE.Clock() in its store; three.js r183+ deprecated it.
+// Remove when r3f ships a stable release using THREE.Timer.
+setConsoleFunction((type: string, message: string, ...args: unknown[]) => {
+  if (
+    type === 'warn' &&
+    typeof message === 'string' &&
+    message.includes('Clock')
+  )
+    return;
+  (console as unknown as Record<string, Function>)[type](message, ...args);
+});
 
 // ── GLSL Noise ───────────────────────────────────────────
 
@@ -116,7 +131,7 @@ varying vec2 vUv;
 
 void main() {
   vUv = uv;
-  vNormal = normalize(normalMatrix * normal);
+  vNormal = normalize(mat3(modelMatrix) * normal);
   vec4 worldPos = modelMatrix * vec4(position, 1.0);
   vWorldPos = worldPos.xyz;
   gl_Position = projectionMatrix * viewMatrix * worldPos;
@@ -216,7 +231,7 @@ varying vec3 vNormal;
 varying vec3 vWorldPos;
 
 void main() {
-  vNormal = normalize(normalMatrix * normal);
+  vNormal = normalize(mat3(modelMatrix) * normal);
   vec4 worldPos = modelMatrix * vec4(position, 1.0);
   vWorldPos = worldPos.xyz;
   gl_Position = projectionMatrix * viewMatrix * worldPos;
@@ -269,7 +284,7 @@ varying vec2 vUv;
 
 void main() {
   vUv = uv;
-  vNormal = normalize(normalMatrix * normal);
+  vNormal = normalize(mat3(modelMatrix) * normal);
   vec4 worldPos = modelMatrix * vec4(position, 1.0);
   vWorldPos = worldPos.xyz;
   gl_Position = projectionMatrix * viewMatrix * worldPos;
@@ -311,7 +326,7 @@ varying vec3 vNormal;
 varying vec3 vWorldPos;
 
 void main() {
-  vNormal = normalize(normalMatrix * normal);
+  vNormal = normalize(mat3(modelMatrix) * normal);
   vec4 worldPos = modelMatrix * vec4(position, 1.0);
   vWorldPos = worldPos.xyz;
   gl_Position = projectionMatrix * viewMatrix * worldPos;
@@ -374,6 +389,96 @@ void main() {
 }
 `;
 
+// ── Textured Earth Shader ────────────────────────────────
+
+const texturedEarthVertexShader = /* glsl */ `
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+varying vec2 vUv;
+
+void main() {
+  vUv = uv;
+  vNormal = normalize(mat3(modelMatrix) * normal);
+  vec4 worldPos = modelMatrix * vec4(position, 1.0);
+  vWorldPos = worldPos.xyz;
+  gl_Position = projectionMatrix * viewMatrix * worldPos;
+}
+`;
+
+const texturedEarthFragmentShader = /* glsl */ `
+uniform sampler2D uDayMap;
+uniform sampler2D uNightMap;
+uniform vec3 uSunDir;
+
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+varying vec2 vUv;
+
+void main() {
+  vec3 normal = normalize(vNormal);
+  vec3 viewDir = normalize(cameraPosition - vWorldPos);
+
+  vec3 dayColor = texture2D(uDayMap, vUv).rgb;
+  vec3 nightColor = texture2D(uNightMap, vUv).rgb * 2.0;
+
+  float NdotL = dot(normal, uSunDir);
+  float dayFactor = smoothstep(-0.15, 0.2, NdotL);
+
+  vec3 litDay = dayColor * (0.3 + 0.7 * max(0.0, NdotL));
+
+  // Specular on oceans (darker areas of the day map)
+  float oceanMask = 1.0 - smoothstep(0.1, 0.35, dot(dayColor, vec3(0.299, 0.587, 0.114)));
+  vec3 halfVec = normalize(uSunDir + viewDir);
+  float spec = pow(max(0.0, dot(normal, halfVec)), 80.0);
+  litDay += vec3(1.0, 0.95, 0.8) * spec * 0.5 * oceanMask;
+
+  // Terminator atmospheric reddening
+  float terminatorBand = smoothstep(-0.15, 0.0, NdotL) * smoothstep(0.2, 0.05, NdotL);
+  litDay = mix(litDay, litDay * vec3(1.1, 0.7, 0.5), terminatorBand * 0.4);
+
+  vec3 finalColor = mix(nightColor, litDay, dayFactor);
+
+  // Fresnel rim
+  float fresnel = pow(1.0 - max(0.0, dot(normal, viewDir)), 3.0);
+  finalColor += vec3(0.2, 0.5, 1.0) * fresnel * 0.2 * dayFactor;
+
+  gl_FragColor = vec4(finalColor, 1.0);
+}
+`;
+
+// ── Textured Moon Shader ─────────────────────────────────
+
+const texturedMoonVertexShader = /* glsl */ `
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+varying vec2 vUv;
+
+void main() {
+  vUv = uv;
+  vNormal = normalize(mat3(modelMatrix) * normal);
+  vec4 worldPos = modelMatrix * vec4(position, 1.0);
+  vWorldPos = worldPos.xyz;
+  gl_Position = projectionMatrix * viewMatrix * worldPos;
+}
+`;
+
+const texturedMoonFragmentShader = /* glsl */ `
+uniform sampler2D uMap;
+uniform vec3 uSunDir;
+
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+varying vec2 vUv;
+
+void main() {
+  vec3 normal = normalize(vNormal);
+  vec3 baseColor = texture2D(uMap, vUv).rgb;
+  float NdotL = max(0.0, dot(normal, uSunDir));
+  vec3 litColor = baseColor * (0.06 + 0.94 * NdotL);
+  gl_FragColor = vec4(litColor, 1.0);
+}
+`;
+
 // ── Burn phases (for engine glow) ────────────────────────
 
 function isBurnPhase(phaseIndex: number): boolean {
@@ -392,7 +497,7 @@ export default function Scene3D({
   return (
     <Canvas
       camera={{ position: [0, 5, 12], fov: 55, near: 0.1, far: 500 }}
-      style={{ background: "transparent" }}
+      style={{ background: 'transparent' }}
       gl={{
         alpha: true,
         antialias: true,
@@ -400,22 +505,19 @@ export default function Scene3D({
         outputColorSpace: THREE.SRGBColorSpace,
       }}
     >
-      <hemisphereLight args={["#334466", "#0a0a18", 0.25]} />
+      <hemisphereLight args={['#334466', '#0a0a18', 0.25]} />
       <directionalLight
         position={[SUN_DIR.x * 80, SUN_DIR.y * 80, SUN_DIR.z * 80]}
         intensity={2.0}
-        color="#fff8f0"
+        color='#fff8f0'
       />
 
       <CustomStars />
 
-      <Earth />
-      <Moon />
+      <EarthWithFallback />
+      <MoonWithFallback />
       <TrajectoryPath missionProgress={missionProgress} />
-      <OrionCapsule
-        missionProgress={missionProgress}
-        phaseIndex={phaseIndex}
-      />
+      <OrionCapsule missionProgress={missionProgress} phaseIndex={phaseIndex} />
       <CameraController
         missionProgress={missionProgress}
         cameraMode={cameraMode}
@@ -494,8 +596,8 @@ function CustomStars() {
     }
 
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const mat = new THREE.PointsMaterial({
       vertexColors: true,
@@ -595,7 +697,7 @@ function Earth() {
       <mesh>
         <sphereGeometry args={[3.5, 32, 32]} />
         <meshBasicMaterial
-          color="#4a9eff"
+          color='#4a9eff'
           transparent
           opacity={0.03}
           side={THREE.BackSide}
@@ -603,11 +705,11 @@ function Earth() {
       </mesh>
 
       {/* Self-illumination glow */}
-      <pointLight color="#1a4a8a" intensity={0.5} distance={8} />
+      <pointLight color='#1a4a8a' intensity={0.5} distance={8} />
 
       {/* Label */}
       <Html position={[0, -4, 0]} center>
-        <div className="text-[10px] font-mono text-blue-300/60 whitespace-nowrap select-none pointer-events-none">
+        <div className='text-[10px] font-mono text-blue-300/60 whitespace-nowrap select-none pointer-events-none'>
           EARTH
         </div>
       </Html>
@@ -625,9 +727,7 @@ function Moon() {
       uSunDir: { value: SUN_DIR.clone() },
       uMoonCenter: { value: MOON_POS.clone() },
       uEarthDir: {
-        value: new THREE.Vector3()
-          .subVectors(EARTH_POS, MOON_POS)
-          .normalize(),
+        value: new THREE.Vector3().subVectors(EARTH_POS, MOON_POS).normalize(),
       },
     }),
     []
@@ -648,7 +748,7 @@ function Moon() {
 
       {/* Label */}
       <Html position={[0, -1.5, 0]} center>
-        <div className="text-[10px] font-mono text-zinc-400/60 whitespace-nowrap select-none pointer-events-none">
+        <div className='text-[10px] font-mono text-zinc-400/60 whitespace-nowrap select-none pointer-events-none'>
           MOON
         </div>
       </Html>
@@ -656,13 +756,192 @@ function Moon() {
   );
 }
 
+// ── Textured Earth (loaded when textures available) ──────
+
+function TexturedEarth() {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const cloudRef = useRef<THREE.Mesh>(null);
+  const timeRef = useRef(0);
+
+  const [dayMap, nightMap, cloudMap] = useTexture([
+    '/textures/earth_day.jpg',
+    '/textures/earth_night.jpg',
+    '/textures/earth_clouds.jpg',
+  ]);
+
+  // Flip textures for correct orientation
+  dayMap.colorSpace = THREE.SRGBColorSpace;
+  nightMap.colorSpace = THREE.SRGBColorSpace;
+  cloudMap.colorSpace = THREE.SRGBColorSpace;
+
+  const earthUniforms = useMemo(
+    () => ({
+      uDayMap: { value: dayMap },
+      uNightMap: { value: nightMap },
+      uSunDir: { value: SUN_DIR.clone() },
+    }),
+    [dayMap, nightMap]
+  );
+
+  const atmosUniforms = useMemo(
+    () => ({
+      uSunDir: { value: SUN_DIR.clone() },
+    }),
+    []
+  );
+
+  const cloudUniforms = useMemo(
+    () => ({
+      uSunDir: { value: SUN_DIR.clone() },
+      uTime: { value: 0 },
+    }),
+    []
+  );
+
+  useFrame((_, delta) => {
+    timeRef.current += delta;
+    if (meshRef.current) meshRef.current.rotation.y += delta * 0.05;
+    if (cloudRef.current) cloudRef.current.rotation.y += delta * 0.065;
+    cloudUniforms.uTime.value = timeRef.current;
+  });
+
+  return (
+    <group position={[0, 0, 0]} rotation={[0, 0, -23.44 * (Math.PI / 180)]}>
+      {/* Earth surface with real textures */}
+      <mesh ref={meshRef}>
+        <sphereGeometry args={[3, 128, 128]} />
+        <shaderMaterial
+          vertexShader={texturedEarthVertexShader}
+          fragmentShader={texturedEarthFragmentShader}
+          uniforms={earthUniforms}
+        />
+      </mesh>
+
+      {/* Clouds — texture-based with transparency */}
+      <mesh ref={cloudRef}>
+        <sphereGeometry args={[3.05, 96, 96]} />
+        <meshBasicMaterial
+          map={cloudMap}
+          transparent
+          opacity={0.35}
+          depthWrite={false}
+          blending={THREE.NormalBlending}
+        />
+      </mesh>
+
+      {/* Atmosphere glow (keep procedural — looks great) */}
+      <mesh>
+        <sphereGeometry args={[3.25, 64, 64]} />
+        <shaderMaterial
+          vertexShader={atmosphereVertexShader}
+          fragmentShader={atmosphereFragmentShader}
+          uniforms={atmosUniforms}
+          transparent
+          depthWrite={false}
+          side={THREE.BackSide}
+        />
+      </mesh>
+
+      <mesh>
+        <sphereGeometry args={[3.5, 32, 32]} />
+        <meshBasicMaterial
+          color='#4a9eff'
+          transparent
+          opacity={0.03}
+          side={THREE.BackSide}
+        />
+      </mesh>
+
+      <pointLight color='#1a4a8a' intensity={0.5} distance={8} />
+
+      <Html position={[0, -4, 0]} center>
+        <div className='text-[10px] font-mono text-blue-300/60 whitespace-nowrap select-none pointer-events-none'>
+          EARTH
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+// ── Textured Moon (loaded when texture available) ────────
+
+function TexturedMoon() {
+  const [moonMap] = useTexture(['/textures/moon.jpg']);
+  moonMap.colorSpace = THREE.SRGBColorSpace;
+
+  const uniforms = useMemo(
+    () => ({
+      uMap: { value: moonMap },
+      uSunDir: { value: SUN_DIR.clone() },
+    }),
+    [moonMap]
+  );
+
+  return (
+    <group position={[MOON_POS.x, MOON_POS.y, MOON_POS.z]}>
+      <mesh>
+        <sphereGeometry args={[0.8, 64, 64]} />
+        <shaderMaterial
+          vertexShader={texturedMoonVertexShader}
+          fragmentShader={texturedMoonFragmentShader}
+          uniforms={uniforms}
+        />
+      </mesh>
+
+      <Html position={[0, -1.5, 0]} center>
+        <div className='text-[10px] font-mono text-zinc-400/60 whitespace-nowrap select-none pointer-events-none'>
+          MOON
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+// ── Earth/Moon wrappers with texture fallback ────────────
+
+function EarthWithFallback() {
+  const [hasTextures, setHasTextures] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch('/textures/earth_day.jpg', { method: 'HEAD' })
+      .then((res) => setHasTextures(res.ok))
+      .catch(() => setHasTextures(false));
+  }, []);
+
+  if (hasTextures) {
+    return (
+      <Suspense fallback={<Earth />}>
+        <TexturedEarth />
+      </Suspense>
+    );
+  }
+
+  return <Earth />;
+}
+
+function MoonWithFallback() {
+  const [hasTexture, setHasTexture] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch('/textures/moon.jpg', { method: 'HEAD' })
+      .then((res) => setHasTexture(res.ok))
+      .catch(() => setHasTexture(false));
+  }, []);
+
+  if (hasTexture) {
+    return (
+      <Suspense fallback={<Moon />}>
+        <TexturedMoon />
+      </Suspense>
+    );
+  }
+
+  return <Moon />;
+}
+
 // ── Trajectory Path ──────────────────────────────────────
 
-function TrajectoryPath({
-  missionProgress,
-}: {
-  missionProgress: number;
-}) {
+function TrajectoryPath({ missionProgress }: { missionProgress: number }) {
   const points = useMemo(() => generateTrajectoryPoints(600), []);
 
   const linePoints = useMemo(
@@ -672,15 +951,13 @@ function TrajectoryPath({
 
   // Gradient colors: orange near Earth → blue in transit → purple near Moon
   const traveledColors = useMemo(() => {
-    const splitIndex = Math.floor(
-      missionProgress * (linePoints.length - 1)
-    );
+    const splitIndex = Math.floor(missionProgress * (linePoints.length - 1));
     const traveled = linePoints.slice(0, splitIndex + 1);
     return traveled.map((_, i) => {
       const t = traveled.length > 1 ? i / (traveled.length - 1) : 0;
-      const orange = new THREE.Color("#f97316");
-      const blue = new THREE.Color("#3b82f6");
-      const purple = new THREE.Color("#a855f7");
+      const orange = new THREE.Color('#f97316');
+      const blue = new THREE.Color('#3b82f6');
+      const purple = new THREE.Color('#a855f7');
       if (t < 0.5) {
         return orange.clone().lerp(blue, t * 2);
       }
@@ -688,9 +965,7 @@ function TrajectoryPath({
     });
   }, [missionProgress, linePoints]);
 
-  const splitIndex = Math.floor(
-    missionProgress * (linePoints.length - 1)
-  );
+  const splitIndex = Math.floor(missionProgress * (linePoints.length - 1));
   const traveledPoints = linePoints.slice(0, splitIndex + 1);
   const remainingPoints = linePoints.slice(splitIndex);
 
@@ -723,7 +998,7 @@ function TrajectoryPath({
       {remainingPoints.length >= 2 && (
         <Line
           points={remainingPoints}
-          color="#3b82f6"
+          color='#3b82f6'
           lineWidth={1}
           transparent
           opacity={0.12}
@@ -738,6 +1013,275 @@ function TrajectoryPath({
 
 // ── Orion Capsule ────────────────────────────────────────
 
+function OrionPrimitive({ burning }: { burning: boolean }) {
+  return (
+    <>
+      {/* Docking mechanism — top of crew module */}
+      <mesh position={[0, 0.44, 0]}>
+        <cylinderGeometry args={[0.04, 0.05, 0.06, 12]} />
+        <meshStandardMaterial color='#888' metalness={0.8} roughness={0.2} />
+      </mesh>
+      <mesh position={[0, 0.41, 0]}>
+        <torusGeometry args={[0.06, 0.008, 8, 24]} />
+        <meshStandardMaterial color='#aaa' metalness={0.7} roughness={0.3} />
+      </mesh>
+
+      {/* Crew Module — wider frustum matching real 5m base diameter */}
+      <mesh position={[0, 0.27, 0]}>
+        <cylinderGeometry args={[0.07, 0.22, 0.28, 24]} />
+        <meshStandardMaterial color='#c0c4cc' metalness={0.4} roughness={0.5} />
+      </mesh>
+
+      {/* Heat shield — slightly convex spherical section */}
+      <mesh position={[0, 0.12, 0]} rotation={[Math.PI, 0, 0]}>
+        <cylinderGeometry args={[0.225, 0.22, 0.02, 24]} />
+        <meshStandardMaterial color='#a89880' metalness={0.2} roughness={0.8} />
+      </mesh>
+
+      {/* Spacecraft adapter ring */}
+      <mesh position={[0, 0.1, 0]}>
+        <torusGeometry args={[0.215, 0.008, 8, 32]} />
+        <meshStandardMaterial color='#666' metalness={0.6} roughness={0.4} />
+      </mesh>
+
+      {/* European Service Module — wider gold/amber Kapton MLI cylinder */}
+      <mesh position={[0, -0.1, 0]}>
+        <cylinderGeometry args={[0.175, 0.175, 0.22, 24]} />
+        <meshStandardMaterial
+          color='#8b6914'
+          emissive='#4a3500'
+          emissiveIntensity={0.05}
+          metalness={0.8}
+          roughness={0.3}
+        />
+      </mesh>
+
+      {/* AJ10 Engine Nozzle — wider bell */}
+      <mesh position={[0, -0.3, 0]}>
+        <cylinderGeometry args={[0.07, 0.12, 0.14, 16]} />
+        <meshStandardMaterial
+          color='#3a3a3a'
+          metalness={0.85}
+          roughness={0.15}
+        />
+      </mesh>
+
+      {/* RCS thruster pods — 4 clusters on ESM */}
+      {[0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map((angle, i) => (
+        <mesh
+          key={`rcs-${i}`}
+          position={[Math.cos(angle) * 0.19, -0.05, Math.sin(angle) * 0.19]}
+          rotation={[0, 0, Math.PI / 2]}
+        >
+          <cylinderGeometry args={[0.012, 0.015, 0.03, 8]} />
+          <meshStandardMaterial color='#555' metalness={0.7} roughness={0.3} />
+        </mesh>
+      ))}
+
+      {/* High-gain antenna dish */}
+      <group position={[0.2, 0.0, 0]} rotation={[0, 0, -Math.PI / 4]}>
+        <mesh>
+          <cylinderGeometry args={[0.0, 0.06, 0.02, 12]} />
+          <meshStandardMaterial color='#ccc' metalness={0.5} roughness={0.4} />
+        </mesh>
+        {/* Antenna arm */}
+        <mesh position={[0, 0.04, 0]}>
+          <cylinderGeometry args={[0.004, 0.004, 0.06, 6]} />
+          <meshStandardMaterial color='#888' metalness={0.6} roughness={0.3} />
+        </mesh>
+      </group>
+
+      {/* X-wing solar arrays with mounting arms */}
+      {[
+        Math.PI / 4,
+        (3 * Math.PI) / 4,
+        (5 * Math.PI) / 4,
+        (7 * Math.PI) / 4,
+      ].map((angle, i) => (
+        <group
+          key={`solar-${i}`}
+          position={[0, -0.1, 0]}
+          rotation={[0, angle, 0]}
+        >
+          {/* Mounting arm */}
+          <mesh position={[0.2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.006, 0.006, 0.15, 6]} />
+            <meshStandardMaterial
+              color='#888'
+              metalness={0.6}
+              roughness={0.3}
+            />
+          </mesh>
+          {/* Solar panel */}
+          <mesh position={[0.5, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <boxGeometry args={[0.02, 0.55, 0.12]} />
+            <meshStandardMaterial
+              color='#0a1628'
+              emissive='#0a1a3c'
+              emissiveIntensity={0.1}
+              metalness={0.3}
+              roughness={0.6}
+            />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Engine exhaust — HDR for bloom */}
+      {burning && (
+        <group position={[0, -0.47, 0]}>
+          <pointLight color='#ff6a00' intensity={5} distance={6} />
+          <mesh rotation={[Math.PI, 0, 0]}>
+            <coneGeometry args={[0.05, 0.3, 8]} />
+            <meshBasicMaterial color={new THREE.Color(4.0, 2.5, 0.5)} />
+          </mesh>
+          <mesh rotation={[Math.PI, 0, 0]}>
+            <coneGeometry args={[0.12, 0.55, 8]} />
+            <meshBasicMaterial
+              color={new THREE.Color(3.0, 1.2, 0.1)}
+              transparent
+              opacity={0.4}
+            />
+          </mesh>
+        </group>
+      )}
+    </>
+  );
+}
+
+function OrionSTL({ burning }: { burning: boolean }) {
+  const geometry = useLoader(STLLoader, '/models/orion.stl');
+
+  // Center, rotate Z-up→Y-up, scale to match crew module size, position at top
+  const processedGeometry = useMemo(() => {
+    const geo = geometry.clone();
+    geo.computeBoundingBox();
+    const box = geo.boundingBox!;
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    geo.translate(-center.x, -center.y, -center.z);
+
+    // Rotate from Z-up (STL/CAD convention) to Y-up (Three.js)
+    geo.rotateY(Math.PI / 2);
+
+    // Scale: the crew module is ~0.28 units tall in our primitive model
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const targetSize = 0.35;
+    const scale = targetSize / maxDim;
+    geo.scale(scale, scale, scale);
+    geo.computeVertexNormals();
+    return geo;
+  }, [geometry]);
+
+  return (
+    <>
+      {/* STL Crew Module — positioned where the primitive CM sits */}
+      <mesh geometry={processedGeometry} position={[0, 0.22, 0]}>
+        <meshStandardMaterial color='#c0c4cc' metalness={0.4} roughness={0.5} />
+      </mesh>
+
+      {/* Heat shield — below the STL capsule */}
+      <mesh position={[0, 0.12, 0]} rotation={[Math.PI, 0, 0]}>
+        <cylinderGeometry args={[0.225, 0.22, 0.02, 24]} />
+        <meshStandardMaterial color='#a89880' metalness={0.2} roughness={0.8} />
+      </mesh>
+
+      {/* Spacecraft adapter ring
+      <mesh position={[0, 0.1, 0]}>
+        <torusGeometry args={[0.215, 0.008, 8, 32]} />
+        <meshStandardMaterial color='#666' metalness={0.6} roughness={0.4} />
+      </mesh> */}
+
+      {/* European Service Module — gold Kapton MLI */}
+      <mesh position={[0, -0.01, 0]}>
+        <cylinderGeometry args={[0.175, 0.175, 0.22, 24]} />
+        <meshStandardMaterial
+          color='#8b6914'
+          emissive='#4a3500'
+          emissiveIntensity={0.05}
+          metalness={0.8}
+          roughness={0.3}
+        />
+      </mesh>
+
+      {/* AJ10 Engine Nozzle */}
+      <mesh position={[0, -0.15, 0]}>
+        <cylinderGeometry args={[0.05, 0.08, 0.1, 16]} />
+        <meshStandardMaterial
+          color='#3a3a3a'
+          metalness={0.85}
+          roughness={0.15}
+        />
+      </mesh>
+
+      {/* RCS thruster pods */}
+      {[0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map((angle, i) => (
+        <mesh
+          key={`stl-rcs-${i}`}
+          position={[Math.cos(angle) * 0.19, -0.05, Math.sin(angle) * 0.19]}
+          rotation={[0, 0, Math.PI / 2]}
+        >
+          <cylinderGeometry args={[0.012, 0.015, 0.03, 8]} />
+          <meshStandardMaterial color='#555' metalness={0.7} roughness={0.3} />
+        </mesh>
+      ))}
+
+      {/* X-wing solar arrays with mounting arms */}
+      {[
+        Math.PI / 4,
+        (3 * Math.PI) / 4,
+        (5 * Math.PI) / 4,
+        (7 * Math.PI) / 4,
+      ].map((angle, i) => (
+        <group
+          key={`stl-solar-${i}`}
+          position={[0, -0.009, 0]}
+          rotation={[0, angle, 0]}
+        >
+          <mesh position={[0.2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.006, 0.006, 0.15, 6]} />
+            <meshStandardMaterial
+              color='#888'
+              metalness={0.6}
+              roughness={0.3}
+            />
+          </mesh>
+          <mesh position={[0.5, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <boxGeometry args={[0.02, 0.55, 0.12]} />
+            <meshStandardMaterial
+              color='#0a1628'
+              emissive='#0a1a3c'
+              emissiveIntensity={0.1}
+              metalness={0.3}
+              roughness={0.6}
+            />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Engine exhaust */}
+      {burning && (
+        <group position={[0, -0.47, 0]}>
+          <pointLight color='#ff6a00' intensity={5} distance={6} />
+          <mesh rotation={[Math.PI, 0, 0]}>
+            <coneGeometry args={[0.05, 0.3, 8]} />
+            <meshBasicMaterial color={new THREE.Color(4.0, 2.5, 0.5)} />
+          </mesh>
+          <mesh rotation={[Math.PI, 0, 0]}>
+            <coneGeometry args={[0.12, 0.55, 8]} />
+            <meshBasicMaterial
+              color={new THREE.Color(3.0, 1.2, 0.1)}
+              transparent
+              opacity={0.4}
+            />
+          </mesh>
+        </group>
+      )}
+    </>
+  );
+}
+
 function OrionCapsule({
   missionProgress,
   phaseIndex,
@@ -748,6 +1292,13 @@ function OrionCapsule({
   const groupRef = useRef<THREE.Group>(null);
   const points = useMemo(() => generateTrajectoryPoints(600), []);
   const burning = isBurnPhase(phaseIndex);
+  const [hasStl, setHasStl] = useState(false);
+
+  useEffect(() => {
+    fetch('/models/orion.stl', { method: 'HEAD' })
+      .then((res) => setHasStl(res.ok))
+      .catch(() => setHasStl(false));
+  }, []);
 
   useFrame(() => {
     if (!groupRef.current) return;
@@ -758,9 +1309,7 @@ function OrionCapsule({
       points,
       Math.min(1, missionProgress + 0.005)
     );
-    const direction = new THREE.Vector3()
-      .subVectors(nextPos, pos)
-      .normalize();
+    const direction = new THREE.Vector3().subVectors(nextPos, pos).normalize();
     if (direction.length() > 0.001) {
       const up = new THREE.Vector3(0, 1, 0);
       const quaternion = new THREE.Quaternion().setFromUnitVectors(
@@ -773,83 +1322,17 @@ function OrionCapsule({
 
   return (
     <group ref={groupRef}>
-      {/* Crew Module — silver metallic frustum */}
-      <mesh position={[0, 0.25, 0]}>
-        <cylinderGeometry args={[0.08, 0.15, 0.3, 16]} />
-        <meshStandardMaterial
-          color="#c0c4cc"
-          metalness={0.7}
-          roughness={0.25}
-        />
-      </mesh>
-
-      {/* Heat shield — disk at capsule base */}
-      <mesh position={[0, 0.095, 0]}>
-        <cylinderGeometry args={[0.155, 0.155, 0.01, 16]} />
-        <meshStandardMaterial color="#d4cfc8" metalness={0.2} roughness={0.7} />
-      </mesh>
-
-      {/* European Service Module — gold/amber Kapton MLI */}
-      <mesh position={[0, -0.1, 0]}>
-        <cylinderGeometry args={[0.13, 0.13, 0.35, 16]} />
-        <meshStandardMaterial
-          color="#b8860b"
-          emissive="#4a3500"
-          emissiveIntensity={0.15}
-          metalness={0.8}
-          roughness={0.3}
-        />
-      </mesh>
-
-      {/* AJ10 Engine Nozzle — dark metallic bell */}
-      <mesh position={[0, -0.35, 0]}>
-        <cylinderGeometry args={[0.06, 0.1, 0.12, 12]} />
-        <meshStandardMaterial color="#3a3a3a" metalness={0.85} roughness={0.15} />
-      </mesh>
-
-      {/* X-wing solar arrays (4 wings at 45/135/225/315 deg) */}
-      {[Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4].map((angle, i) => (
-        <group key={i} position={[0, -0.1, 0]} rotation={[0, angle, 0]}>
-          <mesh position={[0.4, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <boxGeometry args={[0.02, 0.55, 0.1]} />
-            <meshStandardMaterial
-              color="#0a1628"
-              emissive="#0a1a3c"
-              emissiveIntensity={0.1}
-              metalness={0.3}
-              roughness={0.6}
-            />
-          </mesh>
-        </group>
-      ))}
-
-      {/* Engine exhaust — HDR for bloom */}
-      {burning && (
-        <group position={[0, -0.5, 0]}>
-          <pointLight color="#ff6a00" intensity={8} distance={6} />
-          {/* White-hot core */}
-          <mesh rotation={[Math.PI, 0, 0]}>
-            <coneGeometry args={[0.04, 0.25, 8]} />
-            <meshBasicMaterial color={new THREE.Color(4.0, 2.5, 0.5)} />
-          </mesh>
-          {/* Outer plume */}
-          <mesh rotation={[Math.PI, 0, 0]}>
-            <coneGeometry args={[0.1, 0.5, 8]} />
-            <meshBasicMaterial
-              color={new THREE.Color(3.0, 1.2, 0.1)}
-              transparent
-              opacity={0.4}
-            />
-          </mesh>
-        </group>
+      {hasStl ? (
+        <Suspense fallback={<OrionPrimitive burning={burning} />}>
+          <OrionSTL burning={burning} />
+        </Suspense>
+      ) : (
+        <OrionPrimitive burning={burning} />
       )}
-
-      {/* Position indicator glow */}
-      <pointLight color="#3b82f6" intensity={2} distance={3} />
 
       {/* Label */}
       <Html position={[0, 1, 0]} center>
-        <div className="text-[9px] font-mono text-blue-300/80 whitespace-nowrap select-none pointer-events-none bg-black/40 px-1.5 py-0.5 rounded">
+        <div className='text-[9px] font-mono text-blue-300/80 whitespace-nowrap select-none pointer-events-none bg-black/40 px-1.5 py-0.5 rounded'>
           ORION
         </div>
       </Html>
@@ -879,39 +1362,39 @@ function CameraController({
   useEffect(() => {
     if (!controls) return;
     const onStart = () => {
-      if (cameraModeRef.current !== "free") {
-        onCameraModeChange("free");
+      if (cameraModeRef.current !== 'free') {
+        onCameraModeChange('free');
       }
     };
-    (controls as any).addEventListener("start", onStart);
+    (controls as any).addEventListener('start', onStart);
     return () => {
-      (controls as any).removeEventListener("start", onStart);
+      (controls as any).removeEventListener('start', onStart);
     };
   }, [controls, onCameraModeChange]);
 
   useFrame(() => {
-    if (cameraMode === "free") return;
+    if (cameraMode === 'free') return;
 
     const orionPos = getPositionAtProgress(points, missionProgress);
 
     switch (cameraMode) {
-      case "follow": {
+      case 'follow': {
         const offset = new THREE.Vector3(2, 1.5, 4);
         targetPos.current.copy(orionPos).add(offset);
         targetLookAt.current.copy(orionPos);
         break;
       }
-      case "earth": {
+      case 'earth': {
         targetPos.current.set(0, 3, 10);
         targetLookAt.current.set(0, 0, 0);
         break;
       }
-      case "moon": {
+      case 'moon': {
         targetPos.current.set(MOON_POS.x - 2, MOON_POS.y + 2, MOON_POS.z + 5);
         targetLookAt.current.copy(MOON_POS);
         break;
       }
-      case "overview": {
+      case 'overview': {
         targetPos.current.set(20, 15, 45);
         targetLookAt.current.set(20, 0, 2);
         break;

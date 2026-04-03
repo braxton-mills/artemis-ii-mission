@@ -55,7 +55,7 @@ export const missionStages: MissionStage[] = [
     description:
       "SLS produces 8.8 million pounds of thrust at liftoff — 15% more than the Saturn V — sending the crew through Max-Q, SRB separation, and core stage burnout in just eight minutes.",
     details:
-      "At T+0, the twin five-segment SRBs ignite and SLS clears the tower. Max-Q (maximum aerodynamic pressure) occurs at T+1:10. The SRBs separate at T+2:08 at ~45 km altitude after burning 1.6 million kg of propellant each. The Launch Abort System tower jettisons at T+3:18. The core stage\u2019s four RS-25 engines continue until Main Engine Cutoff (MECO) at T+8:06, and the spent core stage separates 10 seconds later. Orion is now in space.",
+      "At T+0, the twin five-segment SRBs ignite and SLS clears the tower. Max-Q (maximum aerodynamic pressure) occurs at T+1:10. The SRBs separate at T+2:08 at ~28 mi altitude after burning ~3.5 million lbs of propellant each. The Launch Abort System tower jettisons at T+3:18. The core stage\u2019s four RS-25 engines continue until Main Engine Cutoff (MECO) at T+8:06, and the spent core stage separates 10 seconds later. Orion is now in space.",
     startMET: 0,
     endMET: 496, // T+8:16
     altitude: { start: 0, peak: 185, end: 160 },
@@ -70,9 +70,9 @@ export const missionStages: MissionStage[] = [
     name: "ICPS Burns & Orbit Setup",
     shortName: "Orbit Setup",
     description:
-      "The ICPS upper stage fires twice to establish a 23.5-hour high Earth orbit with an apogee of 70,000 km — higher than GPS satellites and nearly one-fifth of the way to the Moon.",
+      "The ICPS upper stage fires twice to establish a 23.5-hour high Earth orbit with an apogee of ~43,500 mi — higher than GPS satellites and nearly one-fifth of the way to the Moon.",
     details:
-      "Orion\u2019s solar arrays deploy at T+20 minutes. At T+49 minutes, the ICPS performs a perigee raise maneuver to stabilize the orbit at ~185 km. Then at T+1:47:57, the ICPS fires again for a major apogee raise burn, boosting the orbit to 185 km \u00d7 70,000 km. This expends nearly all of the ICPS\u2019s fuel. The resulting elliptical orbit takes 23.5 hours to complete one revolution — the crew will orbit Earth while climbing to an altitude higher than any human since Apollo.",
+      "Orion\u2019s solar arrays deploy at T+20 minutes. At T+49 minutes, the ICPS performs a perigee raise maneuver to stabilize the orbit at ~115 mi. Then at T+1:47:57, the ICPS fires again for a major apogee raise burn, boosting the orbit to ~115 \u00d7 ~43,500 mi. This expends nearly all of the ICPS\u2019s fuel. The resulting elliptical orbit takes 23.5 hours to complete one revolution — the crew will orbit Earth while climbing to an altitude higher than any human since Apollo.",
     startMET: 496, // T+8:16
     endMET: 12255, // T+3:24:15
     altitude: { start: 160, peak: 70000, end: 185 },
@@ -104,7 +104,7 @@ export const missionStages: MissionStage[] = [
     name: "High Earth Orbit & TLI Prep",
     shortName: "HEO",
     description:
-      "The crew awakens after 4 hours of sleep to prepare for the mission\u2019s most critical burn. At apogee — 70,000 km above Earth — they test communications via the Deep Space Network for the first time.",
+      "The crew awakens after 4 hours of sleep to prepare for the mission\u2019s most critical burn. At apogee — ~43,500 mi above Earth — they test communications via the Deep Space Network for the first time.",
     details:
       "During this phase, the crew performs a small orbit adjustment burn, checks out emergency Deep Space Network communications at the highest point of their orbit, and runs final pre-TLI systems checks. NASA managers conduct a formal GO/NO-GO poll before authorizing the trans-lunar injection burn. The crew is on the clock: TLI must happen at the next perigee passage to hit the Moon at the right time. If anything is off, there is one more orbit to try.",
     startMET: 30600, // ~T+8:30
@@ -123,7 +123,7 @@ export const missionStages: MissionStage[] = [
     description:
       "At T+25.5 hours, as Orion reaches perigee, Mission Specialist Christina Koch initiates the TLI burn using Orion\u2019s own Service Module engine — sending the crew on an escape trajectory to the Moon.",
     details:
-      "Unlike Apollo, where the Saturn V\u2019s S-IVB stage performed TLI, Artemis II uses Orion\u2019s European Service Module AJ10 engine (derived from the Space Shuttle\u2019s Orbital Maneuvering System). Firing at perigee — the lowest, fastest point of the high Earth orbit — Earth\u2019s gravity gives the spacecraft an additional kick. The burn adds approximately 3.1 km/s of delta-V, pushing Orion past escape velocity (~11.2 km/s). After burnout, the crew is Moon-bound with no turning back.",
+      "Unlike Apollo, where the Saturn V\u2019s S-IVB stage performed TLI, Artemis II uses Orion\u2019s European Service Module AJ10 engine (derived from the Space Shuttle\u2019s Orbital Maneuvering System). Firing at perigee — the lowest, fastest point of the high Earth orbit — Earth\u2019s gravity gives the spacecraft an additional kick. The burn adds approximately ~6,900 mph of delta-V, pushing Orion past escape velocity (~25,000 mph). After burnout, the crew is Moon-bound with no turning back.",
     startMET: 91800, // ~T+25:30
     endMET: 93600, // ~T+26:00
     altitude: { start: 185, peak: 1500, end: 3000 },
@@ -155,9 +155,9 @@ export const missionStages: MissionStage[] = [
     name: "Lunar Flyby",
     shortName: "Flyby",
     description:
-      "On Flight Day 6, Orion swings within ~7,400 km of the lunar far side. For 30\u201350 minutes the crew loses all contact with Earth — the first humans to see the far side of the Moon since Apollo 17.",
+      "On Flight Day 6, Orion swings within ~4,600 mi of the lunar far side. For 30\u201350 minutes the crew loses all contact with Earth — the first humans to see the far side of the Moon since Apollo 17.",
     details:
-      "The final outbound trajectory correction fires before closest approach. Orion passes behind the Moon on a free-return trajectory — the Moon\u2019s gravity bends the flight path into a figure-eight that naturally sends the crew back toward Earth. During far-side passage, the Moon blocks all radio signals and the crew is truly alone. They witness Earthrise over the lunar horizon. At closest approach (~7,400 km above the surface), the crew may break Apollo 13\u2019s record for the farthest distance any humans have traveled from Earth: 400,171 km. The maximum distance from Earth during the flyby is expected to be ~400,000 km.",
+      "The final outbound trajectory correction fires before closest approach. Orion passes behind the Moon on a free-return trajectory — the Moon\u2019s gravity bends the flight path into a figure-eight that naturally sends the crew back toward Earth. During far-side passage, the Moon blocks all radio signals and the crew is truly alone. They witness Earthrise over the lunar horizon. At closest approach (~4,600 mi above the surface), the crew may break Apollo 13\u2019s record for the farthest distance any humans have traveled from Earth: ~248,655 mi. The maximum distance from Earth during the flyby is expected to be ~249,000 mi.",
     startMET: 414000, // ~T+115h
     endMET: 432000, // ~T+120h / Day 6
     altitude: { start: 370000, peak: 7400, end: 370000 },
@@ -174,7 +174,7 @@ export const missionStages: MissionStage[] = [
     description:
       "The free-return trajectory carries Orion home over ~4 days. Flight Day 7 is the crew\u2019s well-earned off-duty day — the first rest day in deep space since 1972.",
     details:
-      "The free-return trajectory is the mission\u2019s ultimate safety net: even without engine burns, the Moon\u2019s gravity has already redirected Orion back toward Earth. The Service Module performs small return trajectory correction burns to refine the re-entry corridor. On Flight Day 7, the crew rests. On subsequent days, they stow equipment, configure Orion for re-entry, and run through splashdown procedures. As Earth grows from a marble to a world, the crew prepares to shed their Service Module and face the atmosphere at 40,000 km/h.",
+      "The free-return trajectory is the mission\u2019s ultimate safety net: even without engine burns, the Moon\u2019s gravity has already redirected Orion back toward Earth. The Service Module performs small return trajectory correction burns to refine the re-entry corridor. On Flight Day 7, the crew rests. On subsequent days, they stow equipment, configure Orion for re-entry, and run through splashdown procedures. As Earth grows from a marble to a world, the crew prepares to shed their Service Module and face the atmosphere at ~25,000 mph.",
     startMET: 432000, // Day 6
     endMET: 842400, // ~Day 9.75
     altitude: { start: 400000, peak: 400000, end: 500 },
@@ -189,9 +189,9 @@ export const missionStages: MissionStage[] = [
     name: "Re-entry & Splashdown",
     shortName: "Splashdown",
     description:
-      "The European Service Module is jettisoned 20 minutes before re-entry. Orion hits the atmosphere at ~40,000 km/h and performs a skip re-entry before splashing down in the Pacific Ocean off San Diego.",
+      "The European Service Module is jettisoned 20 minutes before re-entry. Orion hits the atmosphere at ~25,000 mph and performs a skip re-entry before splashing down in the Pacific Ocean off San Diego.",
     details:
-      "The Service Module separates ~20 minutes before Entry Interface (EI) at 122 km altitude, exposing the 5-meter AVCOAT heat shield. Orion strikes the atmosphere at approximately 11 km/s (Mach 32) — the fastest re-entry ever attempted with a crew. The heat shield endures temperatures up to 2,760\u00B0C (~5,000\u00B0F), about half the surface temperature of the Sun. Orion performs a modified skip re-entry: it dips into the atmosphere, uses aerodynamic lift to skip back up briefly, then re-enters a second time. This reduces peak G-forces and improves landing accuracy. Drogue parachutes deploy at ~7.6 km, followed by three 35-meter main parachutes at ~2.4 km. Splashdown at ~33 km/h in the Pacific Ocean off San Diego, where a U.S. Navy amphibious transport dock is waiting for recovery.",
+      "The Service Module separates ~20 minutes before Entry Interface (EI) at ~76 mi altitude, exposing the 16.5-foot AVCOAT heat shield. Orion strikes the atmosphere at approximately ~25,000 mph (Mach 32) — the fastest re-entry ever attempted with a crew. The heat shield endures temperatures up to ~5,000 \u00B0F, about half the surface temperature of the Sun. Orion performs a modified skip re-entry: it dips into the atmosphere, uses aerodynamic lift to skip back up briefly, then re-enters a second time. This reduces peak G-forces and improves landing accuracy. Drogue parachutes deploy at ~4.7 mi, followed by three 115-foot main parachutes at ~1.5 mi. Splashdown at ~20 mph in the Pacific Ocean off San Diego, where a U.S. Navy amphibious transport dock is waiting for recovery.",
     startMET: 842400, // ~Day 9.75
     endMET: 864000, // Day 10
     altitude: { start: 500, peak: 122, end: 0 },

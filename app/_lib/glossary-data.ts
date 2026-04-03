@@ -36,7 +36,7 @@ export const glossaryTerms: GlossaryTerm[] = [
   {
     term: "Perigee",
     definition:
-      "The point in an orbit around Earth where the orbiting object is closest to Earth\u2019s center. For Artemis II\u2019s high Earth orbit, perigee is ~185 km \u2014 and it\u2019s where TLI fires because the spacecraft is moving fastest there.",
+      "The point in an orbit around Earth where the orbiting object is closest to Earth\u2019s center. For Artemis II\u2019s high Earth orbit, perigee is ~115 mi \u2014 and it\u2019s where TLI fires because the spacecraft is moving fastest there.",
     plainEnglish:
       "The lowest point of a loop around Earth \u2014 where you\u2019re skimming closest to the surface and moving the fastest. Artemis II fires its Moon-bound engine here to get maximum bang for the fuel.",
     category: "orbital-mechanics",
@@ -44,25 +44,25 @@ export const glossaryTerms: GlossaryTerm[] = [
   {
     term: "Apogee",
     definition:
-      "The point in an orbit around Earth where the orbiting object is farthest from Earth\u2019s center. Artemis II\u2019s high Earth orbit has an apogee of 70,000 km \u2014 higher than GPS satellites.",
+      "The point in an orbit around Earth where the orbiting object is farthest from Earth\u2019s center. Artemis II\u2019s high Earth orbit has an apogee of ~43,500 mi \u2014 higher than GPS satellites.",
     plainEnglish:
-      "The highest point of a loop around Earth. For Artemis II, that\u2019s 70,000 km up \u2014 almost one-fifth of the way to the Moon, and higher than any human has orbited since Apollo.",
+      "The highest point of a loop around Earth. For Artemis II, that\u2019s ~43,500 mi up \u2014 almost one-fifth of the way to the Moon, and higher than any human has orbited since Apollo.",
     category: "orbital-mechanics",
   },
   {
     term: "Delta-V",
     abbreviation: "\u0394V",
     definition:
-      "The change in velocity a spacecraft needs for a maneuver. TLI requires ~3.1 km/s of delta-V. It is the fundamental measure of propulsive capability.",
+      "The change in velocity a spacecraft needs for a maneuver. TLI requires ~6,900 mph of delta-V. It is the fundamental measure of propulsive capability.",
     plainEnglish:
-      "The \u2018currency\u2019 of spaceflight. Every maneuver costs delta-V, and your fuel supply determines your budget. Want to go to the Moon? That\u2019ll cost about 3.1 km/s of delta-V, please.",
+      "The \u2018currency\u2019 of spaceflight. Every maneuver costs delta-V, and your fuel supply determines your budget. Want to go to the Moon? That\u2019ll cost about 6,900 mph of delta-V, please.",
     category: "physics",
   },
   {
     term: "Space Launch System",
     abbreviation: "SLS",
     definition:
-      "NASA\u2019s super-heavy-lift launch vehicle. Stands 322 feet (98 m) tall and produces 8.8 million pounds of thrust at liftoff \u2014 15% more than the Saturn V.",
+      "NASA\u2019s super-heavy-lift launch vehicle. Stands 322 feet tall and produces 8.8 million pounds of thrust at liftoff \u2014 15% more than the Saturn V.",
     plainEnglish:
       "The most powerful rocket NASA has ever built \u2014 taller than the Statue of Liberty, louder than a rock concert at point-blank range, and strong enough to push a fully loaded 747 to orbital speed.",
     category: "spacecraft",
@@ -70,7 +70,7 @@ export const glossaryTerms: GlossaryTerm[] = [
   {
     term: "Orion",
     definition:
-      "NASA\u2019s crew exploration vehicle for deep-space missions. Carries up to 4 astronauts and is protected by the largest heat shield ever built (5 meters / 16.5 feet in diameter). Artemis II\u2019s Orion has the callsign \u2018Integrity.\u2019",
+      "NASA\u2019s crew exploration vehicle for deep-space missions. Carries up to 4 astronauts and is protected by the largest heat shield ever built (16.5 feet in diameter). Artemis II\u2019s Orion has the callsign \u2018Integrity.\u2019",
     plainEnglish:
       "The capsule the astronauts actually ride in \u2014 like the tip of the rocket that becomes their home for the whole 10-day trip. It\u2019s the only part that comes back to Earth.",
     category: "spacecraft",
@@ -90,7 +90,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition:
       "The upper stage of the SLS Block 1 rocket, derived from the Delta IV Heavy\u2019s upper stage. Uses a single RL10B-2 engine burning liquid hydrogen and liquid oxygen. On Artemis II, it establishes the high Earth orbit but does NOT perform TLI.",
     plainEnglish:
-      "The second stage that gets Orion into a high orbit. Its big job is two burns: one to stabilize the orbit, one to fling it way out to 70,000 km. After that it\u2019s empty, Orion separates, and Glover practices flying around the spent stage.",
+      "The second stage that gets Orion into a high orbit. Its big job is two burns: one to stabilize the orbit, one to fling it way out to ~43,500 mi. After that it\u2019s empty, Orion separates, and Glover practices flying around the spent stage.",
     category: "spacecraft",
   },
   {
@@ -107,13 +107,13 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition:
       "A technique where the spacecraft enters the atmosphere, uses aerodynamic lift to bounce back up briefly, then re-enters a second time. This lowers peak G-forces and dramatically improves landing accuracy. Artemis II uses a modified (shorter) skip compared to Artemis I.",
     plainEnglish:
-      "Like skipping a stone on water \u2014 the capsule dips into the atmosphere, bounces back up, then comes down again for good. This spreads the brutal deceleration over two dips instead of one, and lets them land within 20 km of the target instead of 200 km.",
+      "Like skipping a stone on water \u2014 the capsule dips into the atmosphere, bounces back up, then comes down again for good. This spreads the brutal deceleration over two dips instead of one, and lets them land within ~12 mi of the target instead of ~125 mi.",
     category: "physics",
   },
   {
     term: "Heat Shield (AVCOAT)",
     definition:
-      "An ablative thermal protection system on Orion\u2019s base. AVCOAT (Avcoat 5026-39) slowly burns away in a controlled manner to dissipate heat, withstanding up to 2,760\u00B0C (5,000\u00B0F) during lunar-return re-entry at ~11 km/s.",
+      "An ablative thermal protection system on Orion\u2019s base. AVCOAT (Avcoat 5026-39) slowly burns away in a controlled manner to dissipate heat, withstanding up to ~5,000 \u00B0F during lunar-return re-entry at ~25,000 mph.",
     plainEnglish:
       "A sacrificial shield on the bottom of the capsule that slowly burns away to protect the crew from the inferno of re-entry \u2014 temperatures half as hot as the surface of the Sun. After Artemis I, engineers investigated unexpected \u2018spalling\u2019 (flaking) of the material.",
     category: "spacecraft",
@@ -123,14 +123,14 @@ export const glossaryTerms: GlossaryTerm[] = [
     definition:
       "The volume of space between Earth and the Moon, encompassing all trajectories and orbits within the Earth-Moon system. Artemis II will be the first crewed mission to traverse cislunar space since Apollo 17 in 1972.",
     plainEnglish:
-      "The cosmic neighborhood between Earth and the Moon \u2014 about 384,000 km of mostly empty void. Think of it as the \u2018open ocean\u2019 between two shores.",
+      "The cosmic neighborhood between Earth and the Moon \u2014 about 239,000 mi of mostly empty void. Think of it as the \u2018open ocean\u2019 between two shores.",
     category: "orbital-mechanics",
   },
   {
     term: "Low Earth Orbit",
     abbreviation: "LEO",
     definition:
-      "An orbit between ~160 km and 2,000 km altitude. The ISS orbits at ~400 km. Artemis II passes through LEO briefly during ascent but spends most of its Earth-orbit time in a much higher orbit.",
+      "An orbit between ~100 and ~1,250 mi altitude. The ISS orbits at ~250 mi. Artemis II passes through LEO briefly during ascent but spends most of its Earth-orbit time in a much higher orbit.",
     plainEnglish:
       "The \u2018kiddie pool\u2019 of space \u2014 close enough that you can still see city lights at night. Every crewed mission since Apollo has stayed here... until Artemis II.",
     category: "orbital-mechanics",
@@ -147,7 +147,7 @@ export const glossaryTerms: GlossaryTerm[] = [
   {
     term: "Splashdown",
     definition:
-      "Spacecraft recovery via parachute descent into the ocean. Orion deploys two drogue chutes at ~7.6 km altitude and three 35-meter main parachutes at ~2.4 km, hitting the water at ~33 km/h off San Diego.",
+      "Spacecraft recovery via parachute descent into the ocean. Orion deploys two drogue chutes at ~4.7 mi altitude and three 115-foot main parachutes at ~1.5 mi, hitting the water at ~20 mph off San Diego.",
     plainEnglish:
       "The final plunge \u2014 parachutes pop open, the capsule floats down, and plop! Into the Pacific Ocean. Navy ships are waiting nearby to fish the crew out.",
     category: "mission-ops",
@@ -155,15 +155,15 @@ export const glossaryTerms: GlossaryTerm[] = [
   {
     term: "Escape Velocity",
     definition:
-      "The minimum speed an object must reach to break free from a celestial body\u2019s gravitational pull without further propulsion. For Earth, this is approximately 11.2 km/s (40,270 km/h).",
+      "The minimum speed an object must reach to break free from a celestial body\u2019s gravitational pull without further propulsion. For Earth, this is approximately ~25,000 mph.",
     plainEnglish:
-      "The speed you\u2019d need to throw a ball so hard it never comes back down. For Earth, that\u2019s about 40,000 km/h \u2014 which is exactly what the TLI burn achieves.",
+      "The speed you\u2019d need to throw a ball so hard it never comes back down. For Earth, that\u2019s about 25,000 mph \u2014 which is exactly what the TLI burn achieves.",
     category: "physics",
   },
   {
     term: "Max-Q",
     definition:
-      "Maximum dynamic pressure \u2014 the point during ascent when aerodynamic stress on the vehicle is greatest, typically around T+70 seconds at ~12\u201315 km altitude. The vehicle must be designed to survive this peak load.",
+      "Maximum dynamic pressure \u2014 the point during ascent when aerodynamic stress on the vehicle is greatest, typically around T+70 seconds at ~7\u20139 mi altitude. The vehicle must be designed to survive this peak load.",
     plainEnglish:
       "The moment the rocket is getting punched hardest by the atmosphere \u2014 moving fast but still low enough that the air is thick. It\u2019s the roughest part of the ride, about a minute after liftoff.",
     category: "physics",

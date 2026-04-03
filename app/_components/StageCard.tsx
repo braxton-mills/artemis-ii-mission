@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { MissionStage } from "../_lib/mission-data";
 import { formatMET } from "../_hooks/useMissionTime";
+import { kmToMi, kmsToMph, formatImperial } from "../_lib/units";
 
 const stageIcons: Record<string, string> = {
   countdown: "\u23F3",
@@ -161,19 +162,19 @@ export default function StageCard({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
                 <TelemetryItem
                   label="Peak Alt."
-                  value={`${stage.altitude.peak.toLocaleString()} km`}
+                  value={`${formatImperial(kmToMi(stage.altitude.peak))} mi`}
                 />
                 <TelemetryItem
                   label="Peak Vel."
-                  value={`${stage.velocity.peak} km/s`}
+                  value={`${formatImperial(kmsToMph(stage.velocity.peak))} mph`}
                 />
                 <TelemetryItem
                   label="Dist. Start"
-                  value={`${stage.distanceFromEarth.start.toLocaleString()} km`}
+                  value={`${formatImperial(kmToMi(stage.distanceFromEarth.start))} mi`}
                 />
                 <TelemetryItem
                   label="Dist. End"
-                  value={`${stage.distanceFromEarth.end.toLocaleString()} km`}
+                  value={`${formatImperial(kmToMi(stage.distanceFromEarth.end))} mi`}
                 />
               </div>
             </div>

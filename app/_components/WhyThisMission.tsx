@@ -27,7 +27,7 @@ const milestones = [
   {
     label: "Fastest crewed re-entry in history",
     detail:
-      "Returning at roughly 40,000 km/h, Orion's heat shield endures temperatures up to 2,760 °C during a skip re-entry — proving the thermal protection system before astronauts ride it down from the lunar surface.",
+      "Returning at roughly 25,000 mph, Orion's heat shield endures temperatures up to 5,000 °F during a skip re-entry — proving the thermal protection system before astronauts ride it down from the lunar surface.",
   },
 ];
 

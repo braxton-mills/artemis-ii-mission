@@ -2,6 +2,7 @@
 
 import { useMissionTime, formatMET } from "../_hooks/useMissionTime";
 import { missionStages } from "../_lib/mission-data";
+import { kmToMi, kmsToMph, formatImperial } from "../_lib/units";
 
 export default function CountdownTimer() {
   const { met, phase, phaseIndex, isPreLaunch, isComplete, missionProgress, mounted } =
@@ -86,7 +87,7 @@ export default function CountdownTimer() {
                   Altitude
                 </div>
                 <div className="font-mono text-sm text-zinc-300">
-                  {formatNumber(interpolateValue(phase.altitude, met / 1000, phase.startMET, phase.endMET))} km
+                  {formatNumber(kmToMi(interpolateValue(phase.altitude, met / 1000, phase.startMET, phase.endMET)))} mi
                 </div>
               </div>
               <div>
@@ -94,7 +95,7 @@ export default function CountdownTimer() {
                   Velocity
                 </div>
                 <div className="font-mono text-sm text-zinc-300">
-                  {interpolateValue(phase.velocity, met / 1000, phase.startMET, phase.endMET).toFixed(1)} km/s
+                  {formatImperial(kmsToMph(interpolateValue(phase.velocity, met / 1000, phase.startMET, phase.endMET)))} mph
                 </div>
               </div>
               <div>
@@ -102,12 +103,12 @@ export default function CountdownTimer() {
                   Distance from Earth
                 </div>
                 <div className="font-mono text-sm text-zinc-300">
-                  {formatNumber(interpolateValue(
+                  {formatNumber(kmToMi(interpolateValue(
                     { start: phase.distanceFromEarth.start, peak: Math.max(phase.distanceFromEarth.start, phase.distanceFromEarth.end), end: phase.distanceFromEarth.end },
                     met / 1000,
                     phase.startMET,
                     phase.endMET
-                  ))} km
+                  )))} mi
                 </div>
               </div>
             </div>
