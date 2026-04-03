@@ -32,13 +32,33 @@ interface Scene3DProps {
 // ── Constants ────────────────────────────────────────────
 
 const EARTH_POS = new THREE.Vector3(0, 0, 0);
-const MOON_POS = new THREE.Vector3(40, 0, 3);
+const MOON_POS = new THREE.Vector3(40, 0, 3); // flyby-time position (trajectory target)
 // Full Moon geometry: Sun is behind Earth, opposite Moon direction.
 // Moon orbit has ~5.14° inclination to ecliptic.
 const MOON_DIR = new THREE.Vector3(40, 0, 3).normalize();
 const SUN_DIR = MOON_DIR.clone().negate();
 SUN_DIR.y += 0.08; // ecliptic offset
 SUN_DIR.normalize();
+
+// ── Orbital mechanics constants ─────────────────────────
+const EARTH_SIDEREAL_DAY = 86164; // seconds per full rotation
+const MOON_ORBITAL_PERIOD = 27.322 * 86400; // sidereal month in seconds
+const MOON_ORBITAL_RADIUS = Math.sqrt(40 * 40 + 3 * 3); // ~40.11 scene units
+const FLYBY_MET = 423000; // ~Day 5, approximate midpoint of flyby phase
+const FLYBY_ANGLE = Math.atan2(3, 40); // orbital angle where Moon = (40, 0, 3)
+const MOON_OMEGA = (2 * Math.PI) / MOON_ORBITAL_PERIOD; // rad/s
+const MISSION_DURATION = 864000; // 10 days in seconds
+
+function getMoonPosition(missionProgress: number): THREE.Vector3 {
+  const metSeconds = missionProgress * MISSION_DURATION;
+  // Moon arrives at FLYBY_ANGLE exactly when metSeconds = FLYBY_MET
+  const angle = FLYBY_ANGLE + MOON_OMEGA * (metSeconds - FLYBY_MET);
+  return new THREE.Vector3(
+    MOON_ORBITAL_RADIUS * Math.cos(angle),
+    0,
+    MOON_ORBITAL_RADIUS * Math.sin(angle)
+  );
+}
 
 // Suppress THREE.Clock deprecation from @react-three/fiber v9 internals.
 // r3f creates new THREE.Clock() in its store; three.js r183+ deprecated it.
@@ -514,8 +534,9 @@ export default function Scene3D({
 
       <CustomStars />
 
-      <EarthWithFallback />
-      <MoonWithFallback />
+      <EarthWithFallback missionProgress={missionProgress} />
+      <MoonWithFallback missionProgress={missionProgress} />
+      <MoonOrbitLine />
       <TrajectoryPath missionProgress={missionProgress} />
       <OrionCapsule missionProgress={missionProgress} phaseIndex={phaseIndex} />
       <CameraController
@@ -616,7 +637,7 @@ function CustomStars() {
 
 // ── Earth ────────────────────────────────────────────────
 
-function Earth() {
+function Earth({ missionProgress }: { missionProgress: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const cloudRef = useRef<THREE.Mesh>(null);
   const timeRef = useRef(0);
@@ -646,12 +667,10 @@ function Earth() {
 
   useFrame((_, delta) => {
     timeRef.current += delta;
-    if (meshRef.current) {
-      meshRef.current.rotation.y += delta * 0.05;
-    }
-    if (cloudRef.current) {
-      cloudRef.current.rotation.y += delta * 0.065;
-    }
+    const metSeconds = missionProgress * MISSION_DURATION;
+    const earthAngle = (metSeconds / EARTH_SIDEREAL_DAY) * Math.PI * 2;
+    if (meshRef.current) meshRef.current.rotation.y = earthAngle;
+    if (cloudRef.current) cloudRef.current.rotation.y = earthAngle * 1.03;
     earthUniforms.uTime.value = timeRef.current;
     cloudUniforms.uTime.value = timeRef.current;
   });
@@ -719,24 +738,32 @@ function Earth() {
 
 // ── Moon ─────────────────────────────────────────────────
 
-function Moon() {
+function Moon({ missionProgress }: { missionProgress: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const moonPos = getMoonPosition(missionProgress);
 
   const moonUniforms = useMemo(
     () => ({
       uSunDir: { value: SUN_DIR.clone() },
-      uMoonCenter: { value: MOON_POS.clone() },
+      uMoonCenter: { value: moonPos.clone() },
       uEarthDir: {
-        value: new THREE.Vector3().subVectors(EARTH_POS, MOON_POS).normalize(),
+        value: new THREE.Vector3().subVectors(EARTH_POS, moonPos).normalize(),
       },
     }),
     []
   );
 
+  // Update shader uniforms when Moon moves
+  useFrame(() => {
+    const pos = getMoonPosition(missionProgress);
+    moonUniforms.uMoonCenter.value.copy(pos);
+    moonUniforms.uEarthDir.value.subVectors(EARTH_POS, pos).normalize();
+  });
+
   // Moon is tidally locked — no rotation
 
   return (
-    <group position={[MOON_POS.x, MOON_POS.y, MOON_POS.z]}>
+    <group position={[moonPos.x, moonPos.y, moonPos.z]}>
       <mesh ref={meshRef}>
         <sphereGeometry args={[0.8, 64, 64]} />
         <shaderMaterial
@@ -758,7 +785,7 @@ function Moon() {
 
 // ── Textured Earth (loaded when textures available) ──────
 
-function TexturedEarth() {
+function TexturedEarth({ missionProgress }: { missionProgress: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const cloudRef = useRef<THREE.Mesh>(null);
   const timeRef = useRef(0);
@@ -800,8 +827,10 @@ function TexturedEarth() {
 
   useFrame((_, delta) => {
     timeRef.current += delta;
-    if (meshRef.current) meshRef.current.rotation.y += delta * 0.05;
-    if (cloudRef.current) cloudRef.current.rotation.y += delta * 0.065;
+    const metSeconds = missionProgress * MISSION_DURATION;
+    const earthAngle = (metSeconds / EARTH_SIDEREAL_DAY) * Math.PI * 2;
+    if (meshRef.current) meshRef.current.rotation.y = earthAngle;
+    if (cloudRef.current) cloudRef.current.rotation.y = earthAngle * 1.03;
     cloudUniforms.uTime.value = timeRef.current;
   });
 
@@ -865,8 +894,9 @@ function TexturedEarth() {
 
 // ── Textured Moon (loaded when texture available) ────────
 
-function TexturedMoon() {
+function TexturedMoon({ missionProgress }: { missionProgress: number }) {
   const [moonMap] = useTexture(['/textures/moon.jpg']);
+  const moonPos = getMoonPosition(missionProgress);
   moonMap.colorSpace = THREE.SRGBColorSpace;
 
   const uniforms = useMemo(
@@ -878,7 +908,7 @@ function TexturedMoon() {
   );
 
   return (
-    <group position={[MOON_POS.x, MOON_POS.y, MOON_POS.z]}>
+    <group position={[moonPos.x, moonPos.y, moonPos.z]}>
       <mesh>
         <sphereGeometry args={[0.8, 64, 64]} />
         <shaderMaterial
@@ -899,7 +929,7 @@ function TexturedMoon() {
 
 // ── Earth/Moon wrappers with texture fallback ────────────
 
-function EarthWithFallback() {
+function EarthWithFallback({ missionProgress }: { missionProgress: number }) {
   const [hasTextures, setHasTextures] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -910,16 +940,16 @@ function EarthWithFallback() {
 
   if (hasTextures) {
     return (
-      <Suspense fallback={<Earth />}>
-        <TexturedEarth />
+      <Suspense fallback={<Earth missionProgress={missionProgress} />}>
+        <TexturedEarth missionProgress={missionProgress} />
       </Suspense>
     );
   }
 
-  return <Earth />;
+  return <Earth missionProgress={missionProgress} />;
 }
 
-function MoonWithFallback() {
+function MoonWithFallback({ missionProgress }: { missionProgress: number }) {
   const [hasTexture, setHasTexture] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -930,13 +960,44 @@ function MoonWithFallback() {
 
   if (hasTexture) {
     return (
-      <Suspense fallback={<Moon />}>
-        <TexturedMoon />
+      <Suspense fallback={<Moon missionProgress={missionProgress} />}>
+        <TexturedMoon missionProgress={missionProgress} />
       </Suspense>
     );
   }
 
-  return <Moon />;
+  return <Moon missionProgress={missionProgress} />;
+}
+
+// ── Moon Orbit Line ──────────────────────────────────────
+
+function MoonOrbitLine() {
+  const points = useMemo(() => {
+    const segments = 128;
+    const pts: [number, number, number][] = [];
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      pts.push([
+        MOON_ORBITAL_RADIUS * Math.cos(angle),
+        0,
+        MOON_ORBITAL_RADIUS * Math.sin(angle),
+      ]);
+    }
+    return pts;
+  }, []);
+
+  return (
+    <Line
+      points={points}
+      color="#ffffff"
+      lineWidth={1}
+      transparent
+      opacity={0.06}
+      dashed
+      dashSize={1}
+      gapSize={0.8}
+    />
+  );
 }
 
 // ── Trajectory Path ──────────────────────────────────────
@@ -1443,8 +1504,9 @@ function CameraController({
         break;
       }
       case 'moon': {
-        targetPos.current.set(MOON_POS.x - 2, MOON_POS.y + 2, MOON_POS.z + 5);
-        targetLookAt.current.copy(MOON_POS);
+        const moonNow = getMoonPosition(missionProgress);
+        targetPos.current.set(moonNow.x - 2, moonNow.y + 2, moonNow.z + 5);
+        targetLookAt.current.copy(moonNow);
         break;
       }
       case 'overview': {

@@ -81,7 +81,7 @@ export default function CountdownTimer() {
 
           {/* Live stats */}
           {mounted && (
-            <div className="mt-8 grid grid-cols-3 gap-4 text-center">
+            <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-600 mb-1">
                   Altitude
@@ -100,7 +100,7 @@ export default function CountdownTimer() {
               </div>
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-600 mb-1">
-                  Distance from Earth
+                  From Earth
                 </div>
                 <div className="font-mono text-sm text-zinc-300">
                   {formatNumber(kmToMi(interpolateValue(
@@ -109,6 +109,19 @@ export default function CountdownTimer() {
                     phase.startMET,
                     phase.endMET
                   )))} mi
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-600 mb-1">
+                  From Moon
+                </div>
+                <div className="font-mono text-sm text-zinc-300">
+                  {formatNumber(kmToMi(Math.max(0, 384400 - interpolateValue(
+                    { start: phase.distanceFromEarth.start, peak: Math.max(phase.distanceFromEarth.start, phase.distanceFromEarth.end), end: phase.distanceFromEarth.end },
+                    met / 1000,
+                    phase.startMET,
+                    phase.endMET
+                  ))))} mi
                 </div>
               </div>
             </div>
